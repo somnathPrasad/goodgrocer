@@ -1,0 +1,40 @@
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Android and Gradle
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+.next/
+coverage/
+
+# Logs and temporary files
+*.log
+*.tmp

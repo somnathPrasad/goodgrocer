@@ -1,0 +1,73 @@
+# Architecture decision log
+
+Record architectural decisions here as they are made. Give each decision the
+next sequential ID and append it to this file. Do not rewrite an accepted
+decision to hide history; mark it `Superseded` or `Deprecated` and link the
+replacement decision when appropriate.
+
+## Decision template
+
+## ADR-NNN: Decision title
+
+- Date: YYYY-MM-DD
+- Status: Accepted | Superseded | Deprecated
+
+### Context
+
+What forces or constraints require a decision?
+
+### Decision
+
+What was decided?
+
+### Consequences
+
+What becomes easier, harder, required, or intentionally deferred?
+
+## ADR-001: Use a purpose-based monorepo
+
+- Date: 2026-09-13
+- Status: Accepted
+
+### Context
+
+Goodgrocer will contain a customer application, an administration portal, a
+backend API, shared API contract artifacts, infrastructure definitions,
+documentation, and repository automation.
+
+### Decision
+
+Use one repository organized into `apps/`, `services/`, `packages/`, `infra/`,
+`docs/`, and `scripts/`. Place Android and administration clients under
+`apps/`, the backend API under `services/`, and the reserved API contract area
+under `packages/`.
+
+### Consequences
+
+Related product components and documentation can evolve together. This
+decision establishes locations, but does not select build orchestration,
+dependency management, release processes, or shared-contract tooling.
+
+## ADR-002: Select the initial client and backend technologies
+
+- Date: 2026-09-13
+- Status: Accepted
+
+### Context
+
+The initial customer platform and backend persistence stack need clear
+technology boundaries before application bootstrapping begins.
+
+### Decision
+
+Build the primary customer application as native Android using Kotlin, Jetpack
+Compose, and Material 3. Build the backend API using Python and FastAPI. Use
+PostgreSQL for persistence, SQLAlchemy for database access, and Alembic for
+schema migrations. Clients access business data through the backend API; the
+API service owns database access.
+
+### Consequences
+
+Android and backend implementation work has an agreed technology direction.
+Android SDK and Gradle configuration, Python version and packaging, internal
+application architectures, API design, and deployment remain undecided.
