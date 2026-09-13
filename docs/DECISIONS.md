@@ -71,3 +71,27 @@ API service owns database access.
 Android and backend implementation work has an agreed technology direction.
 Android SDK and Gradle configuration, Python version and packaging, internal
 application architectures, API design, and deployment remain undecided.
+
+## ADR-003: Bootstrap the backend runtime and local database
+
+- Date: 2026-09-13
+- Status: Accepted
+
+### Context
+
+The initial backend needs a reproducible local development path before product
+models or APIs are introduced.
+
+### Decision
+
+Run the backend on Python 3.12 and manage its dependencies with uv. Use the
+synchronous SQLAlchemy 2 API with psycopg 3. Configure PostgreSQL through a
+repository-root environment file and provide PostgreSQL 17 Alpine through
+Docker Compose for local development. Keep `GET /health` as a process-liveness
+check that does not query the database, and run Alembic migrations explicitly.
+
+### Consequences
+
+Developers can start PostgreSQL, run the API, and verify its liveness with a
+small repeatable command sequence. Database readiness, schema revisions, and
+all product-domain models and endpoints remain deferred.

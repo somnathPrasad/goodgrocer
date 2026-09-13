@@ -47,17 +47,19 @@ pickup policies have not been decided.
 
 ## Current scope
 
-The current milestone creates only the monorepo structure and foundational
-documentation.
+The current milestone creates the initial backend foundation: a FastAPI
+service with a liveness endpoint, PostgreSQL development container,
+environment-based database configuration, SQLAlchemy setup, and Alembic
+migration environment.
 
 It does not include:
 
-- Android, iOS, admin portal, or backend application code;
+- Android, iOS, or admin portal application code;
 - authentication or OTP handling;
 - products, search, favourites, cart, addresses, checkout, or orders;
 - payment or UPI integrations;
 - administration functionality;
-- database schemas or migrations;
-- API definitions or generated clients;
-- infrastructure or deployment configuration;
-- build, test, formatting, or continuous integration tooling.
+- database schemas or migration revisions;
+- shared product API contracts or generated clients;
+- deployment infrastructure;
+- formatting or continuous integration tooling.
