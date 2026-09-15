@@ -102,6 +102,11 @@ fun ShopApp(vm: ShopViewModel) {
                 route !in listOf("cart", "checkout") &&
                 !route.startsWith("login")
             ) {
+                val basketSummary = remember(cart) {
+                    val count = cart.sumOf { it.quantity }
+                    val total = rupees(cartSubtotal(cart).toPlainString())
+                    "$count items · $total"
+                }
                 Surface(color = Forest, onClick = {
                     navigate("cart")
                 }) {
@@ -110,9 +115,7 @@ fun ShopApp(vm: ShopViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "${cart.sumOf {
-                                it.quantity
-                            }} items · ${rupees(cartSubtotal(cart).toPlainString())}",
+                            basketSummary,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Text("View basket →", color = MaterialTheme.colorScheme.onPrimary)

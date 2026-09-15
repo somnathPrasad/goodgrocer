@@ -42,8 +42,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import java.math.BigDecimal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -312,18 +314,15 @@ fun ProductScreen(
             null
         ) {
             Price(variant)
-            if (variant.selling_price.toBigDecimal() <
-                variant.mrp.toBigDecimal()
-            ) {
-                Text(
-                    "Save ${rupees(
-                        (
-                            variant.mrp.toBigDecimal() -
-                                variant.selling_price.toBigDecimal()
-                            ).toPlainString()
-                    )}",
-                    color = Forest
-                )
+            val savingsText = remember(variant) {
+                val mrp = variant.mrp.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                val selling = variant.selling_price.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                if (selling < mrp) {
+                    "Save ${rupees((mrp - selling).toPlainString())}"
+                } else null
+            }
+            savingsText?.let {
+                Text(it, color = Forest)
             }
             if (product.available &&
                 variant.available
@@ -382,13 +381,16 @@ fun CartScreen(vm: ShopViewModel, cart: List<CartLine>, checkout: () -> Unit, sh
             }
         }
         item {
+            val subtotalText = remember(cart) {
+                rupees(cartSubtotal(cart).toPlainString())
+            }
             HorizontalDivider()
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Estimated subtotal")
-                Text(rupees(cartSubtotal(cart).toPlainString()), fontWeight = FontWeight.Bold)
+                Text(subtotalText, fontWeight = FontWeight.Bold)
             }
             PrimaryButton("Continue to checkout", click = checkout)
         }

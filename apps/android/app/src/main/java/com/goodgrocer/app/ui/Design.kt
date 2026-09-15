@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,9 +41,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
 import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.Product
 import com.goodgrocer.app.data.Variant
@@ -105,10 +108,14 @@ fun GoodgrocerTheme(content: @Composable () -> Unit) {
         content = content
     )
 }
-fun rupees(value: String): String =
-    NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).format(
-        value.toBigDecimalOrNull() ?: BigDecimal.ZERO
-    )
+private val currencyFormatter = ThreadLocal.withInitial {
+    NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN"))
+}
+
+fun rupees(value: String): String {
+    val amount = value.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    return currencyFormatter.get()?.format(amount) ?: ""
+}
 fun imageUrl(path: String?): String? = path?.let {
     if (it.startsWith("/")) {
         BuildConfig.API_URL.trimEnd('/') +
@@ -120,45 +127,65 @@ fun imageUrl(path: String?): String? = path?.let {
 
 @Composable
 fun ProductImage(path: String?, modifier: Modifier = Modifier) {
-    SubcomposeAsyncImage(
-        model = imageUrl(
-            path
-        ),
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
-        modifier = modifier.clip(
-            RoundedCornerShape(14.dp)
-        ).background(MaterialTheme.colorScheme.surfaceVariant),
-        loading = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+    val painter = rememberAsyncImagePainter(model = imageUrl(path))
+    val state = painter.state
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painter,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+        when (state) {
+            is AsyncImagePainter.State.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
             }
-        },
-        error = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            is AsyncImagePainter.State.Error -> {
                 Icon(
-                    Icons.Outlined.ShoppingBasket,
-                    null,
-                    Modifier.size(40.dp),
+                    imageVector = Icons.Outlined.ShoppingBasket,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
                     tint = Forest.copy(alpha = .4f)
                 )
             }
+            else -> {}
         }
-    )
+    }
 }
 
 @Composable
 fun Price(variant: Variant) {
+    val sellingPriceText = remember(variant.selling_price) {
+        rupees(variant.selling_price)
+    }
+
+    val isDiscounted = remember(variant.selling_price, variant.mrp) {
+        val selling = variant.selling_price.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val mrp = variant.mrp.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        selling < mrp
+    }
+
+    val mrpText = remember(variant.mrp, isDiscounted) {
+        if (isDiscounted) rupees(variant.mrp) else ""
+    }
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(rupees(variant.selling_price), fontWeight = FontWeight.Bold)
-        if (variant.selling_price.toBigDecimal() <
-            variant.mrp.toBigDecimal()
-        ) {
+        Text(sellingPriceText, fontWeight = FontWeight.Bold)
+        if (isDiscounted) {
             Text(
-                rupees(variant.mrp),
+                mrpText,
                 style = MaterialTheme.typography.labelSmall,
                 textDecoration = TextDecoration.LineThrough,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
