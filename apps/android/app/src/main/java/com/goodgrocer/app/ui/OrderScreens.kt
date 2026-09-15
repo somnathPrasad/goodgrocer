@@ -37,11 +37,11 @@ import kotlinx.coroutines.delay
 @Composable
 fun CheckoutScreen(
     vm: ShopViewModel,
-    state: ShopState,
     cart: List<CartLine>,
     addresses: () -> Unit,
     placed: (Int) -> Unit
 ) {
+    val state = collectShopState(vm)
     LaunchedEffect(Unit) { vm.loadAddresses() }
     LazyColumn(
         contentPadding = PaddingValues(20.dp),
@@ -175,8 +175,8 @@ fun CheckoutScreen(
                 TotalRow("Total", quote.total, true)
                 Spacer(Modifier.height(16.dp))
                 PrimaryButton(
-                    if (state.loading) "Placing order…" else "Place order · ${rupees(quote.total)}",
-                    !state.loading && cart.isNotEmpty()
+                    if (state.actionLoading) "Placing order…" else "Place order · ${rupees(quote.total)}",
+                    !state.actionLoading && cart.isNotEmpty()
                 ) { vm.placeOrder(placed) }
             } else {
                 Text(
@@ -185,8 +185,8 @@ fun CheckoutScreen(
                 )
                 Spacer(Modifier.height(16.dp))
                 PrimaryButton(
-                    if (state.loading) "Checking…" else "Review final total",
-                    !state.loading &&
+                    if (state.actionLoading) "Checking…" else "Review final total",
+                    !state.actionLoading &&
                         cart.isNotEmpty() &&
                         (state.fulfilment == "PICKUP" || state.addressId != null)
                 ) {
@@ -209,9 +209,10 @@ fun TotalRow(label: String, amount: String, bold: Boolean = false) {
 }
 
 @Composable
-fun OrdersScreen(vm: ShopViewModel, state: ShopState, open: (Int) -> Unit) {
+fun OrdersScreen(vm: ShopViewModel, open: (Int) -> Unit) {
+    val state = collectShopState(vm)
     LaunchedEffect(Unit) { vm.loadOrders() }
-    if (state.loading && state.orders.isEmpty()) {
+    if (state.ordersLoading && state.orders.isEmpty()) {
         LoadingState()
         return
     }
@@ -267,7 +268,7 @@ fun OrdersScreen(vm: ShopViewModel, state: ShopState, open: (Int) -> Unit) {
         }
         if (state.moreOrders) {
             item {
-                PrimaryButton("Load older orders", !state.loading) { vm.loadOrders(true) }
+                PrimaryButton("Load older orders", !state.ordersLoading) { vm.loadOrders(true) }
             }
         }
     }
@@ -278,9 +279,9 @@ fun OrderScreen(
     id: Int,
     success: Boolean,
     vm: ShopViewModel,
-    state: ShopState,
     reordered: () -> Unit
 ) {
+    val state = collectShopState(vm)
     LaunchedEffect(id) {
         vm.loadOrder(id)
         while (true) {
@@ -293,7 +294,7 @@ fun OrderScreen(
     if (order ==
         null
     ) {
-        if (state.loading) {
+        if (state.orderLoading) {
             LoadingState()
         } else {
             EmptyState("Couldn’t load this order", "Please try again.", "Retry", {
@@ -394,12 +395,12 @@ fun OrderScreen(
                     "Development payment",
                     "No money is transferred. Choose an outcome to test checkout."
                 )
-                PrimaryButton("Simulate successful payment", !state.loading) {
+                PrimaryButton("Simulate successful payment", !state.actionLoading) {
                     vm.developmentPayment(id, "PAID")
                 }
                 TextButton(onClick = {
                     vm.developmentPayment(id, "FAILED")
-                }, enabled = !state.loading) { Text("Simulate failed payment") }
+                }, enabled = !state.actionLoading) { Text("Simulate failed payment") }
             }
         }
         items(order.items, key = {
@@ -431,7 +432,7 @@ fun OrderScreen(
             }
         }
         item {
-            PrimaryButton("Reorder with today’s prices", !state.loading) { confirmReorder = true }
+            PrimaryButton("Reorder with today’s prices", !state.actionLoading) { confirmReorder = true }
         }
     }
     if (confirmReorder) {

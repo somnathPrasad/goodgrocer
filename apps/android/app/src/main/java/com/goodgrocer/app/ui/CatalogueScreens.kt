@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -48,6 +50,9 @@ import androidx.compose.runtime.setValue
 import java.math.BigDecimal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.goodgrocer.app.data.CartLine
@@ -56,19 +61,31 @@ import com.goodgrocer.app.data.cartSubtotal
 @Composable
 fun CatalogueScreen(
     vm: ShopViewModel,
-    state: ShopState,
     cart: List<CartLine>,
     home: Boolean = false,
     categoryId: Int? = null,
     open: (Int) -> Unit,
+    autoFocusSearch: Boolean = false,
     search: () -> Unit = {
     },
     category: (Int) -> Unit = {}
 ) {
+    val state = collectShopState(vm)
     var query by rememberSaveable { mutableStateOf("") }
+    val gridState = rememberLazyGridState()
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(autoFocusSearch) {
+        if (autoFocusSearch) {
+            androidx.compose.runtime.withFrameNanos { }
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
     LaunchedEffect(home, categoryId) { vm.browse(category = categoryId) }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(155.dp),
+        state = gridState,
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -152,7 +169,7 @@ fun CatalogueScreen(
                     OutlinedTextField(value = query, onValueChange = {
                         query = it
                         vm.browse(query = it)
-                    }, modifier = Modifier.fillMaxWidth(), placeholder = {
+                    }, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester), placeholder = {
                         Text("Search products")
                     }, leadingIcon = {
                         Icon(Icons.Outlined.Search, null)
@@ -160,12 +177,17 @@ fun CatalogueScreen(
                 }
             }
         }
-        if (state.loading &&
+        if (state.catalogueLoading && state.products.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        }
+        if (state.catalogueLoading &&
             state.products.isEmpty()
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) { LoadingState() }
         }
-        if (!state.loading &&
+        if (!state.catalogueLoading &&
             state.products.isEmpty()
         ) {
             item(span = {
@@ -201,8 +223,8 @@ fun CatalogueScreen(
             }) {
                 OutlinedButton(onClick = {
                     vm.browse(query, categoryId, true)
-                }, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.loading) "Loading…" else "Load more")
+                }, enabled = !state.catalogueLoading, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.catalogueLoading) "Loading…" else "Load more")
                 }
             }
         }
@@ -213,11 +235,11 @@ fun CatalogueScreen(
 fun ProductScreen(
     id: Int,
     vm: ShopViewModel,
-    state: ShopState,
     cart: List<CartLine>,
     signedIn: Boolean,
     login: () -> Unit
 ) {
+    val state = collectShopState(vm)
     LaunchedEffect(id) {
         vm.loadProduct(id)
         if (signedIn) vm.loadFavourites()
@@ -227,7 +249,7 @@ fun ProductScreen(
     if (product ==
         null
     ) {
-        if (state.loading) {
+        if (state.productLoading) {
             LoadingState()
         } else {
             EmptyState("Couldn’t open this product", "Please try again.", "Retry", {
@@ -244,6 +266,7 @@ fun ProductScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (state.productLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         ProductImage(product.image_url, Modifier.fillMaxWidth().height(240.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -400,12 +423,12 @@ fun CartScreen(vm: ShopViewModel, cart: List<CartLine>, checkout: () -> Unit, sh
 @Composable
 fun FavouritesScreen(
     vm: ShopViewModel,
-    state: ShopState,
     cart: List<CartLine>,
     open: (Int) -> Unit
 ) {
+    val state = collectShopState(vm)
     LaunchedEffect(Unit) { vm.loadFavourites() }
-    if (state.loading && state.favourites.isEmpty()) {
+    if (state.favouritesLoading && state.favourites.isEmpty()) {
         LoadingState()
         return
     }

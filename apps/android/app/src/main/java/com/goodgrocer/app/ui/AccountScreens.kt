@@ -35,7 +35,8 @@ import com.goodgrocer.app.data.Address
 import kotlinx.coroutines.delay
 
 @Composable
-fun LoginScreen(vm: ShopViewModel, state: ShopState, done: () -> Unit) {
+fun LoginScreen(vm: ShopViewModel, done: () -> Unit) {
+    val state = collectShopState(vm)
     var phone by rememberSaveable { mutableStateOf("") }
     var requestedPhone by rememberSaveable { mutableStateOf<String?>(null) }
     var code by rememberSaveable { mutableStateOf("") }
@@ -63,7 +64,7 @@ fun LoginScreen(vm: ShopViewModel, state: ShopState, done: () -> Unit) {
             } else {
                 "Send verification code"
             },
-            !state.loading && phone.length >= 10 && cooldown == 0
+            !state.actionLoading && phone.length >= 10 && cooldown == 0
         ) {
             requestedPhone = phone
             vm.requestOtp(phone)
@@ -76,11 +77,11 @@ fun LoginScreen(vm: ShopViewModel, state: ShopState, done: () -> Unit) {
             ShopField("6-digit code", code, {
                 code = it.filter(Char::isDigit).take(6)
             }, keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-            PrimaryButton("Verify & continue", !state.loading && code.length == 6) {
+            PrimaryButton("Verify & continue", !state.actionLoading && code.length == 6) {
                 vm.verifyOtp(requestedPhone!!, code, done)
             }
         }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (state.actionLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
     }
 }
 
@@ -98,14 +99,15 @@ fun AccountScreen(signedIn: Boolean, login: () -> Unit, addresses: () -> Unit, l
 }
 
 @Composable
-fun AddressScreen(vm: ShopViewModel, state: ShopState) {
+fun AddressScreen(vm: ShopViewModel) {
+    val state = collectShopState(vm)
     LaunchedEffect(Unit) { vm.loadAddresses() }
     var edit by remember { mutableStateOf<Address?>(null) }
     var delete by remember { mutableStateOf<Address?>(null) }
     if (edit !=
         null
     ) {
-        AddressEditor(edit!!, state.loading, { vm.saveAddress(it) { edit = null } }, {
+        AddressEditor(edit!!, state.addressesLoading || state.actionLoading, { vm.saveAddress(it) { edit = null } }, {
             edit =
                 null
         })
@@ -116,8 +118,8 @@ fun AddressScreen(vm: ShopViewModel, state: ShopState) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { PrimaryButton("+ Add address", click = { edit = Address() }) }
-        if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        if (!state.loading &&
+        if (state.addressesLoading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        if (!state.addressesLoading &&
             state.addresses.isEmpty()
         ) {
             item {

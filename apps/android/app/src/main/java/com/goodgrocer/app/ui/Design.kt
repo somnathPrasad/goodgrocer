@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.Product
 import com.goodgrocer.app.data.Variant
@@ -127,7 +129,12 @@ fun imageUrl(path: String?): String? = path?.let {
 
 @Composable
 fun ProductImage(path: String?, modifier: Modifier = Modifier) {
-    val painter = rememberAsyncImagePainter(model = imageUrl(path))
+    val painter = rememberAsyncImagePainter(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(imageUrl(path))
+            .size(800, 800)
+            .build()
+    )
     val state = painter.state
 
     Box(

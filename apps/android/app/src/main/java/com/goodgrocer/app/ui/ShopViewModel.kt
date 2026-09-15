@@ -28,7 +28,13 @@ import org.json.JSONObject
 import retrofit2.HttpException
 
 data class ShopState(
-    val loading: Boolean = false,
+    val catalogueLoading: Boolean = false,
+    val productLoading: Boolean = false,
+    val favouritesLoading: Boolean = false,
+    val addressesLoading: Boolean = false,
+    val ordersLoading: Boolean = false,
+    val orderLoading: Boolean = false,
+    val actionLoading: Boolean = false,
     val error: String? = null,
     val message: String? = null,
     val products: List<Product> = emptyList(),
@@ -52,6 +58,13 @@ data class ShopState(
     val addressId: Int? = null
 )
 
+private data class CatalogueCache(
+    val products: List<Product>,
+    val total: Int,
+    val page: Int,
+    val refreshedAt: Long
+)
+
 class ShopViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = Repository(application)
     val cart = repository.cart
@@ -59,16 +72,29 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(ShopState())
     val state = _state.asStateFlow()
     private var searchJob: Job? = null
+    private var browseGeneration = 0L
+    private var productJob: Job? = null
+    private var productGeneration = 0L
     private var requestKey: String = repository.requestKey()
-    private var pending = 0
-    private fun begin() {
-        pending++
-        change { it.copy(loading = true, error = null) }
+    private val catalogueCache = mutableMapOf<String, CatalogueCache>()
+    private val productCache = mutableMapOf<Int, Product>()
+    private val favouritesCache = mutableListOf<Product>()
+    private val addressesCache = mutableListOf<Address>()
+    private val ordersCache = mutableListOf<Order>()
+    private val orderCache = mutableMapOf<Int, Order>()
+    private var favouritesLoaded = false
+    private var addressesLoaded = false
+    private var ordersLoaded = false
+    private val refreshWindowMs = 60_000L
+
+    private fun begin(setLoading: (ShopState) -> ShopState) {
+        change { setLoading(it).copy(error = null) }
     }
-    private fun end() {
-        pending--
-        change { it.copy(loading = pending > 0) }
+    private fun end(setLoading: (ShopState) -> ShopState) {
+        change(setLoading)
     }
+    private fun actionBegin() = begin { it.copy(actionLoading = true) }
+    private fun actionEnd() = end { it.copy(actionLoading = false) }
     private fun change(block: (ShopState) -> ShopState) {
         _state.value = block(_state.value)
     }
@@ -86,7 +112,7 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         change { it.copy(error = message) }
     }
     private fun task(block: suspend () -> Unit) = viewModelScope.launch {
-        begin()
+        actionBegin()
         try {
             block()
         } catch (
@@ -96,25 +122,31 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         } catch (error: Exception) {
             failure(error)
         } finally {
-            end()
+            actionEnd()
         }
-    }
-    init {
-        browse()
     }
     fun browse(query: String = "", category: Int? = null, append: Boolean = false) {
         searchJob?.cancel()
+        val generation = ++browseGeneration
         searchJob = viewModelScope.launch {
+            val key = "$query|${category ?: "all"}"
+            val cached = catalogueCache[key]
             change {
                 it.copy(
                     query = query,
                     category = category,
                     error = null,
-                    products = if (append) it.products else emptyList()
+                    products = if (append) it.products else cached?.products
+                        ?: if (query.isNotEmpty()) it.products else emptyList(),
+                    total = cached?.total ?: it.total,
+                    page = cached?.page ?: 1
                 )
             }
+            if (!append && cached != null && System.currentTimeMillis() - cached.refreshedAt < refreshWindowMs) {
+                return@launch
+            }
             if (query.isNotEmpty() && !append) delay(350)
-            begin()
+            begin { it.copy(catalogueLoading = true) }
             try {
                 if (state.value.config == null ||
                     (query.isEmpty() && category == null && !append)
@@ -125,6 +157,7 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val page = if (append) state.value.page + 1 else 1
                 val result = repository.api.products(query.ifBlank { null }, category, page)
+                if (generation != browseGeneration) return@launch
                 change {
                     it.copy(
                         products = if (append) it.products + result.items else result.items,
@@ -132,6 +165,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                         total = result.total
                     )
                 }
+                catalogueCache[key] = CatalogueCache(
+                    if (append) state.value.products else result.items,
+                    result.total,
+                    page,
+                    System.currentTimeMillis()
+                )
+                result.items.forEach { productCache[it.id] = it }
             } catch (
                 error: CancellationException
             ) {
@@ -139,15 +179,32 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 failure(error)
             } finally {
-                end()
+                if (generation == browseGeneration) {
+                    end { it.copy(catalogueLoading = false) }
+                }
             }
         }
     }
     fun loadProduct(id: Int) {
-        change { it.copy(product = null) }
-        task {
-            val product = repository.api.product(id)
-            change { it.copy(product = product) }
+        productJob?.cancel()
+        val generation = ++productGeneration
+        change { it.copy(product = productCache[id]) }
+        productJob = viewModelScope.launch {
+            begin { it.copy(productLoading = true) }
+            try {
+                val product = repository.api.product(id)
+                if (generation != productGeneration) return@launch
+                productCache[id] = product
+                change { it.copy(product = product) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                failure(error)
+            } finally {
+                if (generation == productGeneration) {
+                    end { it.copy(productLoading = false) }
+                }
+            }
         }
     }
     fun quantity(product: Product, variant: Variant, quantity: Int) {
@@ -191,10 +248,22 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                     addressId = null
                 )
             }
+            favouritesCache.clear()
+            addressesCache.clear()
+            ordersCache.clear()
+            orderCache.clear()
+            favouritesLoaded = false
+            addressesLoaded = false
+            ordersLoaded = false
         }
     }
-    fun loadAddresses() = task {
+    fun loadAddresses() = viewModelScope.launch {
+        if (addressesLoaded) change { it.copy(addresses = addressesCache.toList()) }
+        begin { it.copy(addressesLoading = true) }
+        try {
         val list = repository.api.addresses()
+        addressesCache.apply { clear(); addAll(list) }
+        addressesLoaded = true
         change {
             it.copy(
                 addresses = list,
@@ -202,6 +271,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                 it.addressId?.takeIf { id -> list.any { a -> a.id == id } }
                     ?: list.firstOrNull()?.id
             )
+        }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            failure(error)
+        } finally {
+            end { it.copy(addressesLoading = false) }
         }
     }
     fun saveAddress(address: Address, done: () -> Unit) = task {
@@ -240,9 +316,21 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         }
         invalidateQuote()
     }
-    fun loadFavourites() = task {
+    fun loadFavourites() = viewModelScope.launch {
+        if (favouritesLoaded) change { it.copy(favourites = favouritesCache.toList()) }
+        begin { it.copy(favouritesLoading = true) }
+        try {
         val list = repository.api.favourites()
+        favouritesCache.apply { clear(); addAll(list) }
+        favouritesLoaded = true
         change { it.copy(favourites = list) }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            failure(error)
+        } finally {
+            end { it.copy(favouritesLoading = false) }
+        }
     }
     fun favourite(product: Product) = task {
         if (state.value.favourites.any {
@@ -298,7 +386,10 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             throw error
         }
     }
-    fun loadOrders(append: Boolean = false) = task {
+    fun loadOrders(append: Boolean = false) = viewModelScope.launch {
+        if (!append && ordersLoaded) change { it.copy(orders = ordersCache.toList()) }
+        begin { it.copy(ordersLoading = true) }
+        try {
         val page = if (append) {
             state.value.orderPage +
                 1
@@ -306,6 +397,9 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             1
         }
         val list = repository.api.orders(page)
+        if (!append) ordersCache.apply { clear(); addAll(list) } else ordersCache.addAll(list)
+        if (!append) ordersLoaded = true
+        list.forEach { orderCache[it.id] = it }
         change {
             it.copy(
                 orders = if (append) {
@@ -318,13 +412,30 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                 moreOrders = list.size == 20
             )
         }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            failure(error)
+        } finally {
+            end { it.copy(ordersLoading = false) }
+        }
     }
     fun loadOrder(id: Int, quiet: Boolean = false) {
         if (!quiet) {
-            change { it.copy(order = null) }
-            task {
+            change { it.copy(order = orderCache[id]) }
+            viewModelScope.launch {
+                begin { it.copy(orderLoading = true) }
+                try {
                 val order = repository.api.order(id)
+                orderCache[id] = order
                 change { it.copy(order = order) }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    failure(error)
+                } finally {
+                    end { it.copy(orderLoading = false) }
+                }
             }
         } else {
             viewModelScope.launch {

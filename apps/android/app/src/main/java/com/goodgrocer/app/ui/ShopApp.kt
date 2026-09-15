@@ -40,19 +40,25 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.goodgrocer.app.data.cartSubtotal
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShopApp(vm: ShopViewModel) {
-    val state by vm.state.collectAsStateWithLifecycle()
+    val messageFlow = remember(vm) {
+        vm.state.map { it.error ?: it.message }.distinctUntilChanged()
+    }
+    val message by messageFlow
+        .collectAsStateWithLifecycle(null)
     val cart by vm.cart.collectAsStateWithLifecycle()
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
     val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(state.error, state.message) {
-        (state.error ?: state.message)?.let {
+    LaunchedEffect(message) {
+        message?.let {
             snackbar.showSnackbar(it, duration = SnackbarDuration.Long)
             vm.clearMessage()
         }
@@ -157,12 +163,17 @@ fun ShopApp(vm: ShopViewModel) {
             modifier = Modifier.padding(padding)
         ) {
             composable("home") {
-                CatalogueScreen(vm, state, cart, home = true, open = {
+                CatalogueScreen(vm, cart, home = true, open = {
                     navigate("product/$it")
                 }, search = { navigate("search") }, category = { navigate("category/$it") })
             }
             composable("search") {
-                CatalogueScreen(vm, state, cart, open = { navigate("product/$it") })
+                CatalogueScreen(
+                    vm,
+                    cart,
+                    open = { navigate("product/$it") },
+                    autoFocusSearch = true
+                )
             }
             composable(
                 "category/{id}",
@@ -175,7 +186,6 @@ fun ShopApp(vm: ShopViewModel) {
             ) { page ->
                 CatalogueScreen(
                     vm,
-                    state,
                     cart,
                     categoryId = page.arguments!!.getInt(
                         "id"
@@ -193,7 +203,7 @@ fun ShopApp(vm: ShopViewModel) {
                     }
                 )
             ) { page ->
-                ProductScreen(page.arguments!!.getInt("id"), vm, state, cart, signedIn, {
+                ProductScreen(page.arguments!!.getInt("id"), vm, cart, signedIn, {
                     authenticated("favourites")
                 })
             }
@@ -209,7 +219,7 @@ fun ShopApp(vm: ShopViewModel) {
                     }
                 )
             ) { page ->
-                LoginScreen(vm, state) {
+                LoginScreen(vm) {
                     val next =
                         page.arguments?.getString("next") ?: "account"
                     nav.popBackStack()
@@ -222,7 +232,7 @@ fun ShopApp(vm: ShopViewModel) {
                         authenticated("favourites")
                     }
                 } else {
-                    FavouritesScreen(vm, state, cart) { navigate("product/$it") }
+                    FavouritesScreen(vm, cart) { navigate("product/$it") }
                 }
             }
             composable("addresses") {
@@ -231,14 +241,14 @@ fun ShopApp(vm: ShopViewModel) {
                         authenticated("addresses")
                     }
                 } else {
-                    AddressScreen(vm, state)
+                    AddressScreen(vm)
                 }
             }
             composable("checkout") {
                 if (!signedIn) {
                     SignInPrompt { authenticated("checkout") }
                 } else {
-                    CheckoutScreen(vm, state, cart, { navigate("addresses") }) { id ->
+                    CheckoutScreen(vm, cart, { navigate("addresses") }) { id ->
                         nav.navigate("order/$id?success=true") {
                             popUpTo("cart") {
                                 inclusive =
@@ -254,7 +264,7 @@ fun ShopApp(vm: ShopViewModel) {
                         authenticated("orders")
                     }
                 } else {
-                    OrdersScreen(vm, state) { navigate("order/$it") }
+                    OrdersScreen(vm) { navigate("order/$it") }
                 }
             }
             composable(
@@ -274,8 +284,7 @@ fun ShopApp(vm: ShopViewModel) {
                 OrderScreen(
                     page.arguments!!.getInt("id"),
                     page.arguments!!.getBoolean("success"),
-                    vm,
-                    state
+                    vm
                 ) {
                     navigate("cart")
                 }
@@ -287,6 +296,12 @@ fun ShopApp(vm: ShopViewModel) {
             }
         }
     }
+}
+
+@Composable
+fun collectShopState(vm: ShopViewModel): ShopState {
+    val state by vm.state.collectAsStateWithLifecycle()
+    return state
 }
 
 @Composable
