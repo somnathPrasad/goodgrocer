@@ -95,3 +95,57 @@ check that does not query the database, and run Alembic migrations explicitly.
 Developers can start PostgreSQL, run the API, and verify its liveness with a
 small repeatable command sequence. Database readiness, schema revisions, and
 all product-domain models and endpoints remain deferred.
+
+## ADR-004: Implement V1 as a modular monolith and two API clients
+
+- Date: 2026-09-15
+- Status: Accepted
+
+### Context
+
+V1 now includes the full catalogue, customer ordering and owner workflow.
+
+### Decision
+
+Keep synchronous FastAPI/PostgreSQL. Use normalized catalogue relations and
+Numeric(12,2) money, immutable order snapshots, explicit transitions and expiring
+signed checkout quotes with order idempotency keys. Active items remain visible
+when unavailable. Pickup can transition from ACCEPTED directly to DELIVERED.
+Delivery fees default to zero and are environment configured. No discounts.
+
+Use Next.js/TypeScript/React with semantic controls and a small custom CSS design
+system. Proxy admin requests through Next.js to FastAPI; admin sessions use an
+HttpOnly SameSite cookie, origin checks and server-side token hashing. Android
+uses Compose, ViewModel/StateFlow, Retrofit/Moshi, Coil and Navigation Compose;
+cart persists locally and credentials are encrypted with Android Keystore.
+
+### Consequences
+
+No additional services or role framework. PostgreSQL owns shared rate limits,
+sessions and idempotency. Contracts originate in FastAPI OpenAPI, with generated
+admin types and explicit Android DTOs. Checkout must be refreshed after changes.
+
+## ADR-005: Fail closed at external provider boundaries
+
+- Date: 2026-09-15
+- Status: Accepted
+
+### Context
+
+SMS, online UPI and production image storage have not been selected.
+
+### Decision
+
+Use explicit provider protocols with development OTP/payment implementations and
+local image storage. Production configuration rejects development auth/payment
+providers. OTPs expire, have hashed codes, attempt and resend limits. Opaque
+sessions are random, hashed, revocable and expiring. Bootstrap admin with a
+prompted password hashed using Argon2. A signed quote never substitutes for
+server-side price/availability checks. Production online payments stay disabled.
+
+### Consequences
+
+Local ordering works without external credentials. Production requires SMS
+implementation, durable media storage, TLS, secrets, backups and deployment
+configuration. Real UPI requires verified callbacks, reconciliation and refunds;
+no development payment can run in production.

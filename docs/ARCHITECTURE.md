@@ -1,53 +1,66 @@
 # Architecture
 
-This document contains only architecture decisions that have been made. The
-current repository is a foundation; application and infrastructure architecture
-will be added only as decisions are accepted.
+## Boundaries and technology
 
-## System boundaries
+Goodgrocer serves one physical Kirana store. Both clients access business data
+only through the backend; FastAPI alone owns PostgreSQL access.
 
-- Goodgrocer initially supports one physical Kirana store.
-- The native Android customer application is the primary customer client.
-- A web administration portal will serve the store owner.
-- Customer and administration clients access business data through the backend
-  API and do not access PostgreSQL directly.
-- The backend API service owns access to PostgreSQL.
+- Android: Kotlin, Jetpack Compose/Material 3, ViewModel, StateFlow/coroutines,
+  Retrofit/OkHttp, Moshi and Coil. Navigation Compose organizes the screens.
+- Admin: Next.js App Router, TypeScript/React, semantic controls and custom CSS.
+- Backend: Python 3.12/uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2,
+  psycopg 3, PostgreSQL 17 and explicit Alembic migrations.
+- Local infrastructure: Docker Compose for PostgreSQL only.
 
-## Chosen technologies
+## Backend
 
-- Android: Kotlin, Jetpack Compose, and Material 3.
-- Backend API: Python and FastAPI.
-- Persistence: PostgreSQL through SQLAlchemy, with Alembic for migrations.
-- Backend runtime and dependency management: Python 3.12 and uv.
-- PostgreSQL access uses SQLAlchemy 2's synchronous API with psycopg 3.
-- A future iOS application will be native Swift and SwiftUI, but it is outside
-  the current repository scope.
-- The administration portal technology stack has not been selected.
+One modular monolith. `app/models` owns normalized tables; `schemas` owns
+validated contracts; `services` owns catalogue, authentication and order rules;
+`api` exposes `/api/v1` and authorization dependencies. `GET /health` remains a
+process-liveness check without a database query. Startup never seeds or migrates.
 
-## Monorepo layout
+Products link to many flat categories and have flexible variants. Prices are
+Numeric(12,2), never floating point. Public catalogue queries paginate and load
+related categories/brands/variants in batches. Inactive products/variants are
+hidden; active unavailable products remain visible. Search uses PostgreSQL ILIKE.
 
-```text
-apps/
-  android/
-  admin-web/
-services/
-  api/
-packages/
-  api-contracts/
-infra/
-docs/
-scripts/
-```
+Customer and admin sessions are opaque random tokens, stored as hashes with
+expiry and explicit logout. Admin credentials use Argon2 and a prompted bootstrap
+command. OTPs use keyed hashes, expiry, attempt limits and PostgreSQL-backed
+rate limits. No Redis, roles or service decomposition.
 
-`packages/api-contracts/` is reserved for shared API contract artifacts. The
-contract format, ownership workflow, client generation strategy, and packaging
-have not been decided.
+Checkout produces a signed, expiring quote. Order creation revalidates it while
+locking involved product/variant rows, serializes submissions per customer and
+uses a unique idempotency key. Orders snapshot prices, names and addresses.
+Order transitions lock the order and enforce the exact product vocabulary;
+payment state is independent. Pickup supports direct ACCEPTED → DELIVERED.
+Paid online cancellation awaits a refund integration.
 
-The backend currently has only thin configuration, database, schema, and API
-route modules. `GET /health` is a process-liveness check and deliberately does
-not query PostgreSQL. Database configuration is supplied through environment
-variables, and migrations are run explicitly rather than during application
-startup.
+## Clients
 
-No deployment topology, infrastructure provider, service decomposition,
-database model, or product API design has been selected.
+The Next.js server proxies `/api/v1/admin` to FastAPI; an HttpOnly SameSite=Strict
+cookie stays in the browser, and FastAPI checks Origin for writes. No browser
+cross-origin access is required. The portal polls orders every 30 seconds.
+
+Android uses UI → ViewModel → Repository → API/local storage. The basket persists
+in private preferences and remains usable without login. Session material is
+AES-GCM encrypted using Android Keystore; backups are disabled. Checkout keys
+persist for retry safety. Money uses BigDecimal. Order details refresh every
+15 seconds while visible. Images use Coil caching and fixed-size placeholders.
+
+OpenAPI is exported to `packages/api-contracts`; the admin consumes generated
+TypeScript types. Android uses explicit Moshi DTOs, verified by tests/builds.
+
+## External services
+
+Protocols isolate OTP delivery, payment attempts and image storage. Development
+providers run only outside production. Local media is re-encoded and stored on
+disk, with `/media` references in the database. A deployment must make it durable
+or supply an object-storage adapter. No production SMS/payment provider or
+hosting provider has been selected; see `PRODUCTION.md`.
+
+## Future considerations
+
+Native Swift/SwiftUI iOS and multi-store remain future work. There are no tenant
+columns, organizations or merchant onboarding. PostgreSQL, a single API and the
+two clients are sufficient for the expected 500-product catalogue.

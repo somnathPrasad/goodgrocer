@@ -1,65 +1,59 @@
 # Goodgrocer product
 
-## Product summary
+## V1 scope
 
-Goodgrocer is a grocery ordering product for one physical Kirana store. The
-store will serve customers in its local town through delivery and pickup.
-Approximately 500 products are expected initially.
+One physical Kirana store, approximately 500 products, a native Android customer
+app and a store-owner web portal share one backend. Browsing, search and a
+persistent local cart require no login. Phone OTP authenticates checkout, saved
+addresses, account favourites and orders. Customers can choose delivery or pickup,
+pay COD or UPI on delivery, track status, and reorder at current prices. Online
+UPI has an explicit development integration; production requires a provider.
 
-Android is the primary customer platform. Customers may browse without
-authentication; authentication, when introduced, will use a phone number and
-one-time password. A web administration portal will later allow the store owner
-to manage products, availability, orders, and related store operations. A
-native iOS application using Swift and SwiftUI is planned for a later phase.
+## Catalogue
 
-## Product direction
+Products have a brand, description, primary image, active and available flags,
+and **multiple flat categories**. Categories have images and display order.
+Variants have flexible labels (500 g, 2 L, Family Pack, Regular), display order,
+MRP and selling price (decimal rupees), active and available flags.
+`0 <= selling_price <= mrp`. No unit taxonomy or inventory quantities.
+An item is orderable only if product.active AND product.available AND
+variant.active AND variant.available. Inactive items are hidden; unavailable
+active items remain visible with an unavailable label. Admin controls availability.
 
-The intended customer experience includes:
+## Orders and checkout
 
-- product browsing, search, and categories;
-- favourites and a cart;
-- phone number and OTP authentication;
-- saved addresses and checkout;
-- cash on delivery, online UPI, and UPI on delivery;
-- local delivery and store pickup;
-- simple order tracking and reorder.
+The backend validates all quantities, availability and current prices and issues
+an expiring quote. Order creation checks it again; changes require a fresh quote.
+Orders retain item names/prices and delivery address snapshots. Payment state
+(PENDING, PAID, FAILED, REFUNDED) is independent of order state.
 
-Products belong to categories and may have variants such as 500 g, 1 kg, and
-5 kg. Each variant has its own price and availability. Inventory quantities do
-not need to be tracked initially. The store owner manually controls product and
-variant availability. A variant is orderable only when both its product and the
-variant itself are available. Whether unavailable items remain visible to
-customers has not been decided.
+Exact order states and transitions:
 
-The currently agreed order statuses are:
+- PLACED → ACCEPTED or CANCELLED
+- ACCEPTED → OUT_FOR_DELIVERY or CANCELLED
+- OUT_FOR_DELIVERY → DELIVERED or CANCELLED
+- DELIVERED and CANCELLED are terminal
 
-- `PLACED`
-- `ACCEPTED`
-- `OUT_FOR_DELIVERY`
-- `DELIVERED`
-- `CANCELLED`
+Pickup additionally permits ACCEPTED → DELIVERED when collected. No PACKING.
+Cancellation requires a reason. Cancellation of a paid online order is blocked
+until a production refund integration exists. COD/UPI-on-delivery is marked PAID
+by the owner when payment is received, independently of delivery status.
 
-Status transitions and cancellation rules have not been decided.
+Delivery serviceability is decided manually by the owner, who may cancel an
+unserviceable order. No maps, geofences, routing or automatic address validation.
+Delivery fee is configurable (default zero), with no minimum order or discounts.
 
-Delivery is limited to the store's local town, and pickup will be supported.
-The town, delivery boundaries, delivery fees, minimum order, and detailed
-pickup policies have not been decided.
+## Owner portal
 
-## Current scope
+One admin account type; secure bootstrap, password login and expiring sessions.
+Dashboard, brands, categories (ordering/images), product search/filter/edit,
+multi-category assignment, variant pricing/order/availability and order workflow.
+Images are uploaded with type/size validation; database holds references only.
 
-The current milestone creates the initial backend foundation: a FastAPI
-service with a liveness endpoint, PostgreSQL development container,
-environment-based database configuration, SQLAlchemy setup, and Alembic
-migration environment.
+## Exclusions and future direction
 
-It does not include:
-
-- Android, iOS, or admin portal application code;
-- authentication or OTP handling;
-- products, search, favourites, cart, addresses, checkout, or orders;
-- payment or UPI integrations;
-- administration functionality;
-- database schemas or migration revisions;
-- shared product API contracts or generated clients;
-- deployment infrastructure;
-- formatting or continuous integration tooling.
+No iOS, customer web shop, tenants/multi-store, subcategories, inventory counts,
+coupons/promotions/combos, reviews/chat, drivers/tracking, staff roles/RBAC,
+loyalty, order notifications, or distributed infrastructure. Future native iOS
+and multi-store design remain future considerations; no store_id is added now.
+Production SMS, online UPI, deployment and backups require operator configuration.
