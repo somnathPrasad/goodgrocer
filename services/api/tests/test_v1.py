@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.models.domain import OTP, now
-from app.schemas.domain import VariantInput
+from app.schemas.domain import ProductInput, VariantInput
 
 
 def cart(data, **changes):
@@ -40,6 +40,22 @@ def place(client, data, **changes):
 def owner(client, data):
     client.cookies.set("gg_admin", data["admin_token"])
     return {"Origin": "http://localhost:3000"}
+
+
+@pytest.mark.parametrize(
+    "image_url",
+    [None, "", "/media/apple.jpg", "https://example.com/apple.jpg"],
+)
+def test_product_input_accepts_supported_image_values(image_url):
+    data = {"name": "Apple", "slug": "apple", "brand_id": 1, "image_url": image_url}
+    assert ProductInput.model_validate(data).image_url == image_url
+
+
+def test_product_input_rejects_unsupported_image_values():
+    with pytest.raises((ValidationError, ValueError), match="uploaded media path"):
+        ProductInput.model_validate(
+            {"name": "Apple", "slug": "apple", "brand_id": 1, "image_url": "http://example.com/apple.jpg"}
+        )
 
 
 def test_catalogue_many_categories_search_and_pagination(client, data):

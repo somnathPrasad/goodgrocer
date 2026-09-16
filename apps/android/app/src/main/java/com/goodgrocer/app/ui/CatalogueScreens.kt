@@ -71,7 +71,7 @@ fun CatalogueScreen(
     category: (Int) -> Unit = {}
 ) {
     val state = collectShopState(vm)
-    var query by rememberSaveable { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf(state.query) }
     val gridState = rememberLazyGridState()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -82,7 +82,11 @@ fun CatalogueScreen(
             keyboardController?.show()
         }
     }
-    LaunchedEffect(home, categoryId) { vm.browse(category = categoryId) }
+    LaunchedEffect(home, categoryId) {
+        if (home || categoryId != null) {
+            vm.browse(category = categoryId)
+        }
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(155.dp),
         state = gridState,
@@ -115,7 +119,7 @@ fun CatalogueScreen(
                     ) {
                         Column(Modifier.fillMaxWidth().padding(24.dp)) {
                             Text(
-                                "Good food.\nClose to home.",
+                                "Grocery\nClose to home.",
                                 style = MaterialTheme.typography.headlineLarge
                             )
                             Spacer(Modifier.height(10.dp))

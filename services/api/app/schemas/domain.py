@@ -19,6 +19,12 @@ def normalize_phone(value: str) -> str:
     return value
 
 
+def validate_image_url(value: str | None) -> str | None:
+    if value and not (value.startswith("/media/") or value.startswith("https://")):
+        raise ValueError("Use an uploaded media path or HTTPS image URL")
+    return value
+
+
 class Schema(BaseModel):
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True, extra="forbid")
 
@@ -40,9 +46,7 @@ class CategoryInput(BrandInput):
     @field_validator("image_url")
     @classmethod
     def image_safe(cls, value):
-        if value and not (value.startswith("/media/") or value.startswith("https://")):
-            raise ValueError("Use an uploaded media path or HTTPS image URL")
-        return value
+        return validate_image_url(value)
 
 
 class CategoryOut(CategoryInput):
@@ -71,11 +75,15 @@ class VariantOut(VariantInput):
 
 class ProductInput(BrandInput):
     image_url: str | None = Field(default=None, max_length=500)
-    _image_safe = field_validator("image_url")(CategoryInput.image_safe)
     brand_id: int
     description: str = Field(default="", max_length=10000)
     available: bool = True
     category_ids: list[int] = Field(default_factory=list, max_length=100)
+
+    @field_validator("image_url")
+    @classmethod
+    def image_safe(cls, value):
+        return validate_image_url(value)
 
 
 class ProductOut(Schema):
