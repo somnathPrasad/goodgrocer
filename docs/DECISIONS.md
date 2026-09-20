@@ -149,3 +149,29 @@ Local ordering works without external credentials. Production requires SMS
 implementation, durable media storage, TLS, secrets, backups and deployment
 configuration. Real UPI requires verified callbacks, reconciliation and refunds;
 no development payment can run in production.
+
+## ADR-006: Use Supabase Storage for production catalogue images
+
+- Date: 2026-09-20
+- Status: Accepted
+
+### Context
+
+Catalogue images must be durable in production, but local development and tests
+must remain usable without network credentials. The existing image provider
+boundary already separates image validation and persistence from catalogue rules.
+
+### Decision
+
+Keep local filesystem image storage as the default for development and tests.
+Add Supabase Storage as an explicitly selected production adapter. FastAPI alone
+uploads images with a backend secret; clients continue to receive public image
+URLs and do not receive storage credentials.
+
+### Consequences
+
+Production deployments require a Supabase project URL, backend secret and public
+catalogue-image bucket. Image validation and JPEG re-encoding remain in FastAPI.
+Changing storage providers remains contained behind `ImageStorage`. Local media
+and seed data are not migrated to production; production catalogue data and
+objects are created independently.

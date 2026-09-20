@@ -44,11 +44,15 @@ can cancel; the customer may reorder. No money is transferred.
   and configure trusted proxy addresses explicitly. Do not trust arbitrary
   forwarded client-IP headers. Admin rate limits currently see the Next.js
   server IP (an intentional conservative aggregate limit for the single owner).
-- Persist `MEDIA_DIR` with backups or implement `ImageStorage` for selected object
-  storage. Public media is intentionally public catalogue content; no private
-  documents should be uploaded. Replaced files are retained; add an operator
-  cleanup process after deciding retention, never delete historical references
-  indiscriminately.
+- Create a public Supabase Storage bucket (default `catalogue-images`) restricted
+  to JPEG objects and a 5 MB maximum. Set `IMAGE_STORAGE_PROVIDER=supabase`, the
+  project `SUPABASE_URL`, a server-only `SUPABASE_SECRET_KEY`, and optionally
+  `SUPABASE_STORAGE_BUCKET`. Never expose the secret to Next.js browser code or
+  Android. FastAPI validates and re-encodes uploads before storing immutable
+  `catalogue/*.jpg` objects. The app does not create the bucket at startup.
+- Local seed media is not migrated to production. Replaced production objects are
+  retained; add an operator cleanup process after deciding retention, never delete
+  historical references indiscriminately.
 - Schedule database/media backups and practice restore. Establish log rotation
   and retention, session/rate-limit/expired-OTP cleanup and operational alerts.
   Request logs contain method/path/status/duration/request ID, not auth bodies.

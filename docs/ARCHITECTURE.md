@@ -54,10 +54,12 @@ TypeScript types. Android uses explicit Moshi DTOs, verified by tests/builds.
 ## External services
 
 Protocols isolate OTP delivery, payment attempts and image storage. Development
-providers run only outside production. Local media is re-encoded and stored on
-disk, with `/media` references in the database. A deployment must make it durable
-or supply an object-storage adapter. No production SMS/payment provider or
-hosting provider has been selected; see `PRODUCTION.md`.
+providers run only outside production. Local development and tests re-encode
+media and store it on disk, with `/media` references in the database. Production
+uses an explicitly selected Supabase Storage adapter while preserving the same
+validation and re-encoding boundary. Local seed media is not promoted or migrated
+to production. No production SMS/payment provider or hosting provider has been
+selected; see `PRODUCTION.md`.
 
 ## Future considerations
 

@@ -136,6 +136,10 @@ Root `.env` is read independently of the current working directory:
 | `SECRET_KEY` | Signs quotes and keyed OTP hashes; replace with a random secret for production |
 | `OTP_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
 | `PAYMENT_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
+| `IMAGE_STORAGE_PROVIDER` | `local` for development/tests; production requires `supabase` |
+| `SUPABASE_URL` | Supabase project HTTPS URL; required for Supabase image storage |
+| `SUPABASE_SECRET_KEY` | Server-only `sb_secret_...` API key; never expose it to either client |
+| `SUPABASE_STORAGE_BUCKET` | Public catalogue-image bucket; defaults to `catalogue-images` |
 | `ADMIN_ORIGIN` | `http://localhost:3000`; exact trusted browser origin |
 | `PUBLIC_API_URL` | `http://localhost:8000`; HTTPS required in production |
 | `MEDIA_DIR` | Optional absolute path; defaults to `services/api/media` |
@@ -148,9 +152,11 @@ there is intentionally no cross-origin CORS allowlist. FastAPI checks Origin on
 admin writes. Customer bearer sessions cannot authorize admin endpoints.
 
 Uploads accept JPEG/PNG/WebP up to 5 MB and 20 megapixels, decode/re-encode to
-JPEG to strip metadata, and store random filenames outside PostgreSQL. Serve
-`MEDIA_DIR` persistently in a deployment; do not use an ephemeral filesystem.
-Set images to uploaded `/media/…` paths or external HTTPS URLs.
+JPEG to strip metadata, and store immutable random filenames outside PostgreSQL.
+Local development stores them under `MEDIA_DIR`. Production uploads them under
+`catalogue/` in the configured public Supabase Storage bucket and persists the
+public HTTPS URL. The bucket must already exist; application startup does not
+provision it. Local seed media is intentionally not migrated to production.
 
 ## Tests, formatting and builds
 
@@ -212,7 +218,7 @@ Verification results and tested limits: [docs/VERIFICATION.md](docs/VERIFICATION
 See [production configuration](docs/PRODUCTION.md). Real SMS delivery and online
 UPI require selected providers and credentials **plus adapter implementation**.
 The shipped development providers cannot run in production. Before public use,
-configure TLS, a random secret, database credentials, persistent media/backups,
+configure TLS, a random secret, database credentials, Supabase Storage/backups,
 release signing and store-specific delivery fee/pickup instructions. This repo
 does not provision hosting, signing keys or a notification system.
 

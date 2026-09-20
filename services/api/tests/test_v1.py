@@ -54,7 +54,12 @@ def test_product_input_accepts_supported_image_values(image_url):
 def test_product_input_rejects_unsupported_image_values():
     with pytest.raises((ValidationError, ValueError), match="uploaded media path"):
         ProductInput.model_validate(
-            {"name": "Apple", "slug": "apple", "brand_id": 1, "image_url": "http://example.com/apple.jpg"}
+            {
+                "name": "Apple",
+                "slug": "apple",
+                "brand_id": 1,
+                "image_url": "http://example.com/apple.jpg",
+            }
         )
 
 
@@ -370,6 +375,33 @@ def test_online_payment_boundary(client, data):
 def test_production_rejects_development_providers():
     with pytest.raises(ValidationError):
         Settings(environment="production")
+
+
+def test_supabase_storage_requires_current_backend_credentials():
+    with pytest.raises(ValidationError, match="HTTPS SUPABASE_URL"):
+        Settings(image_storage_provider="supabase")
+    with pytest.raises(ValidationError, match="current SUPABASE_SECRET_KEY"):
+        Settings(
+            image_storage_provider="supabase",
+            supabase_url="https://example.supabase.co",
+            supabase_secret_key="legacy-key",
+        )
+
+
+def test_production_accepts_supabase_storage_configuration():
+    settings = Settings(
+        environment="production",
+        otp_provider="disabled",
+        payment_provider="disabled",
+        secret_key="a-production-secret-that-is-long-enough",
+        public_api_url="https://api.example.com",
+        admin_origin="https://admin.example.com",
+        image_storage_provider="supabase",
+        supabase_url="https://example.supabase.co",
+        supabase_secret_key="sb_secret_test",
+    )
+
+    assert settings.image_storage_provider == "supabase"
 
 
 @pytest.mark.parametrize("quantity", [0, -1, 100])

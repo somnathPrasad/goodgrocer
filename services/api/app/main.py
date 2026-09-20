@@ -28,8 +28,9 @@ def create_app() -> FastAPI:
     application = FastAPI(title="Goodgrocer API", version="1.0.0")
     application.include_router(api_router)
     application.include_router(router)
-    settings.media_dir.mkdir(parents=True, exist_ok=True)
-    application.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
+    if settings.image_storage_provider == "local":
+        settings.media_dir.mkdir(parents=True, exist_ok=True)
+        application.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
 
     @application.exception_handler(DomainError)
     async def domain_error(request, exc):
