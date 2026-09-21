@@ -25,11 +25,8 @@ interface Api {
     @GET("api/v1/products/{id}")
     suspend fun product(@Path("id") id: Int): Product
 
-    @POST("api/v1/auth/otp/request")
-    suspend fun requestOtp(@Body request: PhoneRequest): OtpResult
-
-    @POST("api/v1/auth/otp/verify")
-    suspend fun verifyOtp(@Body request: VerifyRequest): AuthToken
+    @POST("api/v1/auth/google")
+    suspend fun googleLogin(@Body request: GoogleLoginRequest): AuthToken
 
     @POST("api/v1/auth/logout")
     suspend fun logout()

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.goodgrocer.app.data.CartLine
 import kotlinx.coroutines.delay
@@ -111,6 +113,12 @@ fun CheckoutScreen(
                 Text(
                     "Collect your order from the store after it is accepted. Show your order number when you arrive."
                 )
+                ShopField(
+                    "Contact phone for pickup",
+                    state.contactPhone,
+                    { vm.checkoutOptions(contactPhone = it) },
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                )
             }
         }
         item {
@@ -175,7 +183,13 @@ fun CheckoutScreen(
                 TotalRow("Total", quote.total, true)
                 Spacer(Modifier.height(16.dp))
                 PrimaryButton(
-                    if (state.actionLoading) "Placing order…" else "Place order · ${rupees(quote.total)}",
+                    if (state.actionLoading) {
+                        "Placing order…"
+                    } else {
+                        "Place order · ${rupees(
+                            quote.total
+                        )}"
+                    },
                     !state.actionLoading && cart.isNotEmpty()
                 ) { vm.placeOrder(placed) }
             } else {
@@ -188,7 +202,12 @@ fun CheckoutScreen(
                     if (state.actionLoading) "Checking…" else "Review final total",
                     !state.actionLoading &&
                         cart.isNotEmpty() &&
-                        (state.fulfilment == "PICKUP" || state.addressId != null)
+                        (
+                            state.fulfilment == "PICKUP" &&
+                                state.contactPhone.length >= 10 ||
+                                state.fulfilment == "DELIVERY" &&
+                                state.addressId != null
+                            )
                 ) {
                     vm.reviewQuote()
                 }
@@ -275,12 +294,7 @@ fun OrdersScreen(vm: ShopViewModel, open: (Int) -> Unit) {
 }
 
 @Composable
-fun OrderScreen(
-    id: Int,
-    success: Boolean,
-    vm: ShopViewModel,
-    reordered: () -> Unit
-) {
+fun OrderScreen(id: Int, success: Boolean, vm: ShopViewModel, reordered: () -> Unit) {
     val state = collectShopState(vm)
     LaunchedEffect(id) {
         vm.loadOrder(id)
@@ -432,7 +446,10 @@ fun OrderScreen(
             }
         }
         item {
-            PrimaryButton("Reorder with today’s prices", !state.actionLoading) { confirmReorder = true }
+            PrimaryButton("Reorder with today’s prices", !state.actionLoading) {
+                confirmReorder =
+                    true
+            }
         }
     }
     if (confirmReorder) {

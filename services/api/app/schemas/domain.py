@@ -107,18 +107,8 @@ class ProductPage(Schema):
     page_size: int
 
 
-class PhoneInput(Schema):
-    phone_number: str
-    _phone = field_validator("phone_number")(normalize_phone)
-
-
-class VerifyInput(PhoneInput):
-    code: str = Field(pattern=r"^\d{6}$")
-
-
-class OTPResponse(Schema):
-    message: str
-    development_code: str | None = None
+class GoogleLoginInput(Schema):
+    id_token: str = Field(min_length=1, max_length=10000)
 
 
 class TokenResponse(Schema):
@@ -160,6 +150,10 @@ class CheckoutInput(Schema):
     fulfilment_type: Literal["DELIVERY", "PICKUP"]
     address_id: int | None = None
     payment_method: Literal["COD", "UPI_ON_DELIVERY", "ONLINE_UPI"]
+    contact_phone: str | None = None
+    _contact_phone = field_validator("contact_phone")(
+        lambda value: normalize_phone(value) if value else None
+    )
 
     @model_validator(mode="after")
     def valid_cart(self):

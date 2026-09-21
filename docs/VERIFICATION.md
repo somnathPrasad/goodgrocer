@@ -1,4 +1,4 @@
-# V1 verification — 2026-09-15
+# V1 verification — 2026-09-15 (historical, before Google sign-in change)
 
 ## Automated checks
 
@@ -44,3 +44,12 @@ through HTTP, and its forms were production-built and type-checked. Delivery
 transitions, addresses, favourites, stale checkout, availability, ownership and
 payment boundaries are covered by PostgreSQL tests. Real SMS and online payment
 providers remain unselected, so no real message or money transfer was tested.
+
+## Google sign-in change — 2026-09-21
+
+- API suite and isolated Alembic upgrade/check/downgrade: 41 passed.
+- Python Ruff lint and format checks: passed.
+- Android debug Kotlin compilation, unit tests and ktlint: passed.
+- Admin TypeScript check and generated OpenAPI types: passed.
+- A live Google account exchange was not tested because OAuth client IDs and
+  Android signing fingerprints have not been configured for this environment.

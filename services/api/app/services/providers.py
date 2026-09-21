@@ -14,23 +14,6 @@ from app.core.config import get_settings
 from app.core.errors import DomainError
 
 
-class OTPProvider(Protocol):
-    def send(self, phone: str, code: str) -> None: ...
-
-
-class DevelopmentOTPProvider:
-    def send(self, phone: str, code: str) -> None:
-        # The request response exposes this code only in development.
-        if get_settings().environment == "production":
-            raise RuntimeError("Development OTP forbidden")
-
-
-def otp_provider() -> OTPProvider:
-    if get_settings().otp_provider == "development" and get_settings().environment != "production":
-        return DevelopmentOTPProvider()
-    raise DomainError("OTP_NOT_CONFIGURED", "Phone login is not configured", 503)
-
-
 class PaymentProvider(Protocol):
     name: str
 

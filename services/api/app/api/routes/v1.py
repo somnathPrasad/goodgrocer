@@ -26,11 +26,10 @@ from app.schemas.domain import (
     CategoryInput,
     CategoryOut,
     CheckoutInput,
+    GoogleLoginInput,
     LoginInput,
     OrderInput,
     OrderOut,
-    OTPResponse,
-    PhoneInput,
     ProductInput,
     ProductOut,
     ProductPage,
@@ -40,7 +39,6 @@ from app.schemas.domain import (
     TransitionInput,
     VariantInput,
     VariantOut,
-    VerifyInput,
 )
 from app.services import auth, catalogue, orders
 from app.services.providers import image_storage, payment_provider
@@ -90,14 +88,9 @@ def product(product_id: int, db: Session = Depends(get_db)):
     return catalogue.product_out(catalogue.get_product(db, product_id))
 
 
-@router.post("/auth/otp/request", response_model=OTPResponse, tags=["auth"])
-def request_otp(data: PhoneInput, request: Request, db: Session = Depends(get_db)):
-    return auth.request_otp(db, data.phone_number, request.client.host)
-
-
-@router.post("/auth/otp/verify", response_model=TokenResponse, tags=["auth"])
-def verify_otp(data: VerifyInput, db: Session = Depends(get_db)):
-    return auth.verify_otp(db, data.phone_number, data.code)
+@router.post("/auth/google", response_model=TokenResponse, tags=["auth"])
+def google_login(data: GoogleLoginInput, request: Request, db: Session = Depends(get_db)):
+    return auth.google_login(db, data.id_token, request.client.host)
 
 
 @router.post("/auth/logout", status_code=204, tags=["auth"])

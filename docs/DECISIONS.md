@@ -175,3 +175,31 @@ catalogue-image bucket. Image validation and JPEG re-encoding remain in FastAPI.
 Changing storage providers remains contained behind `ImageStorage`. Local media
 and seed data are not migrated to production; production catalogue data and
 objects are created independently.
+
+## ADR-007: Use Google sign-in for customer accounts
+
+- Date: 2026-09-21
+- Status: Accepted
+
+### Context
+
+Production SMS setup blocks the phone OTP path. The Android customer app needs an
+account for checkout, saved addresses, favourites and order history. Contact
+numbers are still needed to fulfil orders.
+
+### Decision
+
+Replace customer OTP login with Google sign-in through Android Credential Manager.
+Android sends the ID token to FastAPI. FastAPI verifies the token against the
+configured web OAuth client ID, uses Google's stable `sub` claim to identify the
+customer, then issues the existing opaque session. A delivery address supplies
+the contact phone for delivery; pickup checkout asks for one. Contact numbers do
+not establish account ownership.
+
+### Consequences
+
+Deployment needs Google OAuth web and Android client configuration, including the
+app signing certificate fingerprints. Existing phone-only customer records and
+orders remain stored but are not automatically linked to a Google account. A
+verified migration path must be decided before migrating existing production
+users. The old OTP table is retained for legacy data but has no active endpoint.

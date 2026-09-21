@@ -1,6 +1,9 @@
 package com.goodgrocer.app.ui
 
 import android.app.Application
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.exceptions.ClearCredentialException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.goodgrocer.app.data.Address
@@ -8,16 +11,14 @@ import com.goodgrocer.app.data.CartItem
 import com.goodgrocer.app.data.CartLine
 import com.goodgrocer.app.data.Category
 import com.goodgrocer.app.data.CheckoutRequest
+import com.goodgrocer.app.data.GoogleLoginRequest
 import com.goodgrocer.app.data.Order
 import com.goodgrocer.app.data.OrderRequest
-import com.goodgrocer.app.data.OtpResult
-import com.goodgrocer.app.data.PhoneRequest
 import com.goodgrocer.app.data.Product
 import com.goodgrocer.app.data.Quote
 import com.goodgrocer.app.data.Repository
 import com.goodgrocer.app.data.StoreConfig
 import com.goodgrocer.app.data.Variant
-import com.goodgrocer.app.data.VerifyRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,10 +52,10 @@ data class ShopState(
     val moreOrders: Boolean = false,
     val order: Order? = null,
     val quote: Quote? = null,
-    val otp: OtpResult? = null,
     val config: StoreConfig? = null,
     val fulfilment: String = "DELIVERY",
     val payment: String = "COD",
+    val contactPhone: String = "",
     val addressId: Int? = null
 )
 
@@ -136,13 +137,20 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                     query = query,
                     category = category,
                     error = null,
-                    products = if (append) it.products else cached?.products
-                        ?: if (query.isNotEmpty()) it.products else emptyList(),
+                    products = if (append) {
+                        it.products
+                    } else {
+                        cached?.products
+                            ?: if (query.isNotEmpty()) it.products else emptyList()
+                    },
                     total = cached?.total ?: it.total,
                     page = cached?.page ?: 1
                 )
             }
-            if (!append && cached != null && System.currentTimeMillis() - cached.refreshedAt < refreshWindowMs) {
+            if (!append &&
+                cached != null &&
+                System.currentTimeMillis() - cached.refreshedAt < refreshWindowMs
+            ) {
                 return@launch
             }
             if (query.isNotEmpty() && !append) delay(350)
@@ -218,19 +226,21 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     fun checkoutOptions(
         fulfilment: String = state.value.fulfilment,
         payment: String = state.value.payment,
-        addressId: Int? = state.value.addressId
+        addressId: Int? = state.value.addressId,
+        contactPhone: String = state.value.contactPhone
     ) {
-        change { it.copy(fulfilment = fulfilment, payment = payment, addressId = addressId) }
+        change {
+            it.copy(
+                fulfilment = fulfilment,
+                payment = payment,
+                addressId = addressId,
+                contactPhone = contactPhone
+            )
+        }
         invalidateQuote()
     }
-    fun requestOtp(phone: String) = task {
-        change { it.copy(otp = null) }
-        val result = repository.api.requestOtp(PhoneRequest(phone))
-        change { it.copy(otp = result) }
-    }
-    fun verifyOtp(phone: String, code: String, done: () -> Unit) = task {
-        repository.signIn(repository.api.verifyOtp(VerifyRequest(phone, code)).token)
-        change { it.copy(otp = null) }
+    fun googleSignIn(idToken: String, done: () -> Unit) = task {
+        repository.signIn(repository.api.googleLogin(GoogleLoginRequest(idToken)).token)
         done()
     }
     fun logout() = task {
@@ -238,6 +248,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             repository.api.logout()
         } finally {
             repository.clearSession()
+            try {
+                CredentialManager.create(getApplication()).clearCredentialState(
+                    ClearCredentialStateRequest()
+                )
+            } catch (_: ClearCredentialException) {
+                // Local and server sessions are already cleared.
+            }
             change {
                 it.copy(
                     addresses = emptyList(),
@@ -261,17 +278,20 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         if (addressesLoaded) change { it.copy(addresses = addressesCache.toList()) }
         begin { it.copy(addressesLoading = true) }
         try {
-        val list = repository.api.addresses()
-        addressesCache.apply { clear(); addAll(list) }
-        addressesLoaded = true
-        change {
-            it.copy(
-                addresses = list,
-                addressId =
-                it.addressId?.takeIf { id -> list.any { a -> a.id == id } }
-                    ?: list.firstOrNull()?.id
-            )
-        }
+            val list = repository.api.addresses()
+            addressesCache.apply {
+                clear()
+                addAll(list)
+            }
+            addressesLoaded = true
+            change {
+                it.copy(
+                    addresses = list,
+                    addressId =
+                    it.addressId?.takeIf { id -> list.any { a -> a.id == id } }
+                        ?: list.firstOrNull()?.id
+                )
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -320,10 +340,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         if (favouritesLoaded) change { it.copy(favourites = favouritesCache.toList()) }
         begin { it.copy(favouritesLoading = true) }
         try {
-        val list = repository.api.favourites()
-        favouritesCache.apply { clear(); addAll(list) }
-        favouritesLoaded = true
-        change { it.copy(favourites = list) }
+            val list = repository.api.favourites()
+            favouritesCache.apply {
+                clear()
+                addAll(list)
+            }
+            favouritesLoaded = true
+            change { it.copy(favourites = list) }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -356,7 +379,8 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             state.value.addressId
         } else {
             null
-        }
+        },
+        if (state.value.fulfilment == "PICKUP") state.value.contactPhone else null
     )
     fun reviewQuote() = task {
         val quote = repository.api.quote(checkout())
@@ -373,7 +397,8 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                     request.payment_method,
                     request.address_id,
                     quote.quote_token,
-                    requestKey
+                    requestKey,
+                    request.contact_phone
                 )
             )
             repository.replaceCart(emptyList())
@@ -390,28 +415,35 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         if (!append && ordersLoaded) change { it.copy(orders = ordersCache.toList()) }
         begin { it.copy(ordersLoading = true) }
         try {
-        val page = if (append) {
-            state.value.orderPage +
+            val page = if (append) {
+                state.value.orderPage +
+                    1
+            } else {
                 1
-        } else {
-            1
-        }
-        val list = repository.api.orders(page)
-        if (!append) ordersCache.apply { clear(); addAll(list) } else ordersCache.addAll(list)
-        if (!append) ordersLoaded = true
-        list.forEach { orderCache[it.id] = it }
-        change {
-            it.copy(
-                orders = if (append) {
-                    it.orders +
+            }
+            val list = repository.api.orders(page)
+            if (!append) {
+                ordersCache.apply {
+                    clear()
+                    addAll(list)
+                }
+            } else {
+                ordersCache.addAll(list)
+            }
+            if (!append) ordersLoaded = true
+            list.forEach { orderCache[it.id] = it }
+            change {
+                it.copy(
+                    orders = if (append) {
+                        it.orders +
+                            list
+                    } else {
                         list
-                } else {
-                    list
-                },
-                orderPage = page,
-                moreOrders = list.size == 20
-            )
-        }
+                    },
+                    orderPage = page,
+                    moreOrders = list.size == 20
+                )
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -426,9 +458,9 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 begin { it.copy(orderLoading = true) }
                 try {
-                val order = repository.api.order(id)
-                orderCache[id] = order
-                change { it.copy(order = order) }
+                    val order = repository.api.order(id)
+                    orderCache[id] = order
+                    change { it.copy(order = order) }
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {

@@ -42,6 +42,8 @@ def resolve(db, customer, data, lock=False):
     if data.fulfilment_type == "DELIVERY":
         address = owned(db, Address, data.address_id, customer.id)
         snapshot = AddressInput.model_validate(address).model_dump(mode="json")
+    elif not (data.contact_phone or customer.phone_number):
+        raise DomainError("CONTACT_PHONE_REQUIRED", "Enter a contact phone for pickup", 422)
     ids = sorted(i.variant_id for i in data.items)
     query = (
         select(ProductVariant)
@@ -156,7 +158,11 @@ def place_order(db, customer, data):
     order = Order(
         order_number="GG-" + uuid4().hex[:12].upper(),
         customer_id=customer.id,
-        customer_phone=customer.phone_number,
+        customer_phone=(
+            result["address_snapshot"]["phone"]
+            if data.fulfilment_type == "DELIVERY"
+            else data.contact_phone or customer.phone_number
+        ),
         idempotency_key=data.idempotency_key,
         request_hash=request_hash,
         fulfilment_type=data.fulfilment_type,

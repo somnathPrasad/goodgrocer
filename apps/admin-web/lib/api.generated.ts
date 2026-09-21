@@ -106,7 +106,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/auth/otp/request": {
+  "/api/v1/auth/google": {
     parameters: {
       query?: never;
       header?: never;
@@ -115,25 +115,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Request Otp */
-    post: operations["request_otp_api_v1_auth_otp_request_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/auth/otp/verify": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Verify Otp */
-    post: operations["verify_otp_api_v1_auth_otp_verify_post"];
+    /** Google Login */
+    post: operations["google_login_api_v1_auth_google_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -757,6 +740,13 @@ export interface components {
        * @enum {string}
        */
       payment_method: "COD" | "UPI_ON_DELIVERY" | "ONLINE_UPI";
+      /** Contact Phone */
+      contact_phone?: string | null;
+    };
+    /** GoogleLoginInput */
+    GoogleLoginInput: {
+      /** Id Token */
+      id_token: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -797,13 +787,6 @@ export interface components {
       /** Password */
       password: string;
     };
-    /** OTPResponse */
-    OTPResponse: {
-      /** Message */
-      message: string;
-      /** Development Code */
-      development_code?: string | null;
-    };
     /** OrderInput */
     OrderInput: {
       /** Items */
@@ -820,6 +803,8 @@ export interface components {
        * @enum {string}
        */
       payment_method: "COD" | "UPI_ON_DELIVERY" | "ONLINE_UPI";
+      /** Contact Phone */
+      contact_phone?: string | null;
       /** Quote Token */
       quote_token: string;
       /** Idempotency Key */
@@ -882,11 +867,6 @@ export interface components {
       status: string;
       /** Amount */
       amount: string;
-    };
-    /** PhoneInput */
-    PhoneInput: {
-      /** Phone Number */
-      phone_number: string;
     };
     /** ProductInput */
     ProductInput: {
@@ -1069,13 +1049,6 @@ export interface components {
       /** Product Id */
       product_id: number;
     };
-    /** VerifyInput */
-    VerifyInput: {
-      /** Phone Number */
-      phone_number: string;
-      /** Code */
-      code: string;
-    };
   };
   responses: never;
   parameters: never;
@@ -1231,7 +1204,7 @@ export interface operations {
       };
     };
   };
-  request_otp_api_v1_auth_otp_request_post: {
+  google_login_api_v1_auth_google_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -1240,40 +1213,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["PhoneInput"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["OTPResponse"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  verify_otp_api_v1_auth_otp_verify_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["VerifyInput"];
+        "application/json": components["schemas"]["GoogleLoginInput"];
       };
     };
     responses: {

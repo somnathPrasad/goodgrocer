@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     environment: Literal["development", "test", "production"] = "development"
     secret_key: str = "local-development-only-change-before-production"
-    otp_provider: Literal["development", "disabled"] = "development"
+    google_web_client_id: str | None = None
     payment_provider: Literal["development", "disabled"] = "development"
     image_storage_provider: Literal["local", "supabase"] = "local"
     media_dir: Path = Path(__file__).resolve().parents[2] / "media"
@@ -46,9 +46,11 @@ class Settings(BaseSettings):
             ):
                 raise ValueError("Supabase image storage requires a current SUPABASE_SECRET_KEY")
         if self.environment == "production":
+            if not self.google_web_client_id:
+                raise ValueError("Production requires GOOGLE_WEB_CLIENT_ID")
             if self.image_storage_provider != "supabase":
                 raise ValueError("Production requires Supabase image storage")
-            if self.otp_provider == "development" or self.payment_provider == "development":
+            if self.payment_provider == "development":
                 raise ValueError("Development providers are forbidden in production")
             if len(self.secret_key) < 32 or self.secret_key.startswith("local-development"):
                 raise ValueError("Set a random production SECRET_KEY of at least 32 characters")

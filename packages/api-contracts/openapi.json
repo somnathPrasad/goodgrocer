@@ -239,59 +239,18 @@
         }
       }
     },
-    "/api/v1/auth/otp/request": {
+    "/api/v1/auth/google": {
       "post": {
         "tags": [
           "auth"
         ],
-        "summary": "Request Otp",
-        "operationId": "request_otp_api_v1_auth_otp_request_post",
+        "summary": "Google Login",
+        "operationId": "google_login_api_v1_auth_google_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PhoneInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OTPResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/auth/otp/verify": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Verify Otp",
-        "operationId": "verify_otp_api_v1_auth_otp_verify_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyInput"
+                "$ref": "#/components/schemas/GoogleLoginInput"
               }
             }
           },
@@ -2269,6 +2228,17 @@
               "ONLINE_UPI"
             ],
             "title": "Payment Method"
+          },
+          "contact_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Phone"
           }
         },
         "additionalProperties": false,
@@ -2279,6 +2249,22 @@
           "payment_method"
         ],
         "title": "CheckoutInput"
+      },
+      "GoogleLoginInput": {
+        "properties": {
+          "id_token": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Id Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id_token"
+        ],
+        "title": "GoogleLoginInput"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2382,31 +2368,6 @@
         ],
         "title": "LoginInput"
       },
-      "OTPResponse": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "development_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Development Code"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "OTPResponse"
-      },
       "OrderInput": {
         "properties": {
           "items": {
@@ -2445,6 +2406,17 @@
               "ONLINE_UPI"
             ],
             "title": "Payment Method"
+          },
+          "contact_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Phone"
           },
           "quote_token": {
             "type": "string",
@@ -2623,20 +2595,6 @@
           "amount"
         ],
         "title": "PaymentOut"
-      },
-      "PhoneInput": {
-        "properties": {
-          "phone_number": {
-            "type": "string",
-            "title": "Phone Number"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "phone_number"
-        ],
-        "title": "PhoneInput"
       },
       "ProductInput": {
         "properties": {
@@ -3110,26 +3068,6 @@
           "product_id"
         ],
         "title": "VariantOut"
-      },
-      "VerifyInput": {
-        "properties": {
-          "phone_number": {
-            "type": "string",
-            "title": "Phone Number"
-          },
-          "code": {
-            "type": "string",
-            "pattern": "^\\d{6}$",
-            "title": "Code"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "phone_number",
-          "code"
-        ],
-        "title": "VerifyInput"
       }
     }
   }

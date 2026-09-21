@@ -7,7 +7,7 @@ from PIL import Image
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.models.domain import OTP, now
+from app.models.domain import Customer, now
 from app.schemas.domain import ProductInput, VariantInput
 
 
@@ -247,51 +247,58 @@ def test_reorder_current_price_and_unavailable(client, db, data):
     assert result["items"] == [] and result["unavailable"] == ["Rice · 1 kg"]
 
 
-def test_otp_expiry_attempts_resend_and_logout(client, db):
-    phone = "+919999999999"
-    response = client.post("/api/v1/auth/otp/request", json={"phone_number": phone})
-    assert response.status_code == 200, response.text
-    code = response.json()["development_code"]
-    assert db.get(OTP, phone).code_hash != code
-    assert client.post("/api/v1/auth/otp/request", json={"phone_number": phone}).status_code == 429
-    wrong = "000000" if code != "000000" else "111111"
-    for _ in range(5):
-        assert (
-            client.post(
-                "/api/v1/auth/otp/verify", json={"phone_number": phone, "code": wrong}
-            ).status_code
-            == 401
-        )
-    assert (
-        client.post(
-            "/api/v1/auth/otp/verify", json={"phone_number": phone, "code": code}
-        ).status_code
-        == 401
+def test_google_sign_in_uses_verified_subject_and_logout(client, db, monkeypatch):
+    monkeypatch.setattr(
+        "app.services.auth.get_settings",
+        lambda: Settings(google_web_client_id="web-client.apps.googleusercontent.com"),
     )
-    row = db.get(OTP, phone)
-    row.attempts = 0
-    row.expires_at = now() - timedelta(seconds=1)
-    db.commit()
-    assert (
-        client.post(
-            "/api/v1/auth/otp/verify", json={"phone_number": phone, "code": code}
-        ).status_code
-        == 401
-    )
-    row.expires_at = now() + timedelta(minutes=5)
-    db.commit()
-    response = client.post("/api/v1/auth/otp/verify", json={"phone_number": phone, "code": code})
+
+    def verify(token, request, audience):
+        assert audience == "web-client.apps.googleusercontent.com"
+        if token == "invalid":
+            raise ValueError("bad signature")
+        return {"sub": "google-account-123", "email": "person@example.com"}
+
+    monkeypatch.setattr("app.services.auth.google_id_token.verify_oauth2_token", verify)
+    assert client.post("/api/v1/auth/google", json={"id_token": "invalid"}).status_code == 401
+    response = client.post("/api/v1/auth/google", json={"id_token": "valid"})
     assert response.status_code == 200, response.text
+    customer = db.query(Customer).filter_by(google_subject="google-account-123").one()
+    assert customer.phone_number is None
+    again = client.post("/api/v1/auth/google", json={"id_token": "valid"})
+    assert again.status_code == 200
+    assert db.query(Customer).filter_by(google_subject="google-account-123").count() == 1
     headers = {"Authorization": "Bearer " + response.json()["token"]}
     assert client.get("/api/v1/orders", headers=headers).status_code == 200
     assert client.post("/api/v1/auth/logout", headers=headers).status_code == 204
     assert client.get("/api/v1/orders", headers=headers).status_code == 401
-    assert (
-        client.post(
-            "/api/v1/auth/otp/verify", json={"phone_number": phone, "code": code}
-        ).status_code
-        == 401
+
+
+def test_google_customer_pickup_requires_contact_phone(client, db, monkeypatch, data):
+    google_customer = Customer(google_subject="google-account-456")
+    db.add(google_customer)
+    db.commit()
+    from app.services.auth import new_session
+
+    headers = {
+        "Authorization": "Bearer " + new_session(db, customer_id=google_customer.id)["token"]
+    }
+    request = cart(data)
+    assert client.post("/api/v1/checkout/quote", json=request, headers=headers).status_code == 422
+    request["contact_phone"] = "9876543210"
+    quote = client.post("/api/v1/checkout/quote", json=request, headers=headers)
+    assert quote.status_code == 200, quote.text
+    order = client.post(
+        "/api/v1/orders",
+        json={
+            **request,
+            "quote_token": quote.json()["quote_token"],
+            "idempotency_key": "google-pickup-key-123",
+        },
+        headers=headers,
     )
+    assert order.status_code == 201, order.text
+    assert order.json()["customer_phone"] == "+919876543210"
 
 
 def test_admin_csrf_auth_upload_and_product_edit(client, data):
@@ -379,7 +386,7 @@ def test_production_rejects_development_providers():
 
 def test_supabase_storage_requires_current_backend_credentials():
     with pytest.raises(ValidationError, match="HTTPS SUPABASE_URL"):
-        Settings(image_storage_provider="supabase")
+        Settings(image_storage_provider="supabase", supabase_url=None, supabase_secret_key=None)
     with pytest.raises(ValidationError, match="current SUPABASE_SECRET_KEY"):
         Settings(
             image_storage_provider="supabase",
@@ -391,7 +398,7 @@ def test_supabase_storage_requires_current_backend_credentials():
 def test_production_accepts_supabase_storage_configuration():
     settings = Settings(
         environment="production",
-        otp_provider="disabled",
+        google_web_client_id="web-client.apps.googleusercontent.com",
         payment_provider="disabled",
         secret_key="a-production-secret-that-is-long-enough",
         public_api_url="https://api.example.com",

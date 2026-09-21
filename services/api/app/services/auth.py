@@ -1,18 +1,19 @@
 import hashlib
-import hmac
 import secrets
 from datetime import UTC, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
+from google.auth.exceptions import TransportError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import DomainError
-from app.models.domain import OTP, Admin, AuthSession, Customer, RateLimit, now
-from app.services.providers import otp_provider
+from app.models.domain import Admin, AuthSession, Customer, RateLimit, now
 
 password_hasher = PasswordHasher()
 DUMMY_PASSWORD_HASH = password_hasher.hash(secrets.token_urlsafe(32))
@@ -43,41 +44,6 @@ def rate_limit(db: Session, key: str, limit: int, seconds: int):
     db.commit()
 
 
-def code_digest(phone: str, code: str):
-    return hmac.new(
-        get_settings().secret_key.encode(),
-        (phone + ":" + code).encode(),
-        hashlib.sha256,
-    ).hexdigest()
-
-
-def request_otp(db: Session, phone: str, ip: str):
-    provider = otp_provider()
-    rate_limit(db, "otp-ip:" + digest(ip), 20, 3600)
-    rate_limit(db, "otp-phone:" + phone, 5, 3600)
-    row = db.scalar(select(OTP).where(OTP.phone_number == phone).with_for_update())
-    if row and aware(row.sent_at) > now() - timedelta(seconds=60):
-        raise DomainError("OTP_RESEND", "Wait 60 seconds before requesting another code", 429)
-    code = f"{secrets.randbelow(1000000):06d}"
-    if row is None:
-        row = OTP(phone_number=phone)
-        db.add(row)
-    row.code_hash, row.expires_at = (
-        code_digest(phone, code),
-        now() + timedelta(minutes=5),
-    )
-    row.sent_at, row.attempts = now(), 0
-    provider.send(phone, code)
-    db.commit()
-    return {
-        "message": "Code requested. It expires in 5 minutes.",
-        "development_code": code
-        if get_settings().environment != "production"
-        and get_settings().otp_provider == "development"
-        else None,
-    }
-
-
 def new_session(db: Session, customer_id=None, admin_id=None):
     token = secrets.token_urlsafe(48)
     expiry = now() + timedelta(hours=12 if admin_id else get_settings().session_hours)
@@ -93,25 +59,24 @@ def new_session(db: Session, customer_id=None, admin_id=None):
     return {"token": token, "expires_at": expiry}
 
 
-def verify_otp(db: Session, phone: str, code: str):
-    row = db.scalar(select(OTP).where(OTP.phone_number == phone).with_for_update())
-    if row is None or aware(row.expires_at) < now() or row.attempts >= 5:
-        raise DomainError(
-            "INVALID_OTP",
-            "Code expired or attempts exhausted. Request a new code.",
-            401,
-        )
-    row.attempts += 1
-    if not hmac.compare_digest(row.code_hash, code_digest(phone, code)):
-        db.commit()
-        raise DomainError("INVALID_OTP", "Incorrect code", 401)
-    # Keep the row to retain the resend cooldown after successful verification.
-    row.attempts = 5
-    customer = db.scalar(select(Customer).where(Customer.phone_number == phone))
-    if customer is None:
-        customer = Customer(phone_number=phone)
-        db.add(customer)
-        db.flush()
+def google_login(db: Session, token: str, ip: str):
+    client_id = get_settings().google_web_client_id
+    if not client_id:
+        raise DomainError("GOOGLE_NOT_CONFIGURED", "Google sign-in is not configured", 503)
+    rate_limit(db, "google-ip:" + digest(ip), 30, 900)
+    try:
+        claims = google_id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+    except (ValueError, TransportError):
+        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401) from None
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject or len(subject) > 255:
+        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401)
+    db.execute(
+        insert(Customer)
+        .values(google_subject=subject)
+        .on_conflict_do_nothing(index_elements=[Customer.google_subject])
+    )
+    customer = db.scalar(select(Customer).where(Customer.google_subject == subject))
     return new_session(db, customer_id=customer.id)
 
 

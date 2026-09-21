@@ -47,7 +47,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import java.math.BigDecimal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -57,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.goodgrocer.app.data.CartLine
 import com.goodgrocer.app.data.cartSubtotal
+import java.math.BigDecimal
 
 @Composable
 fun CatalogueScreen(
@@ -170,14 +170,24 @@ fun CatalogueScreen(
                         "Find your favourites in this aisle"
                     )
                 } else {
-                    OutlinedTextField(value = query, onValueChange = {
-                        query = it
-                        vm.browse(query = it)
-                    }, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester), placeholder = {
-                        Text("Search products")
-                    }, leadingIcon = {
-                        Icon(Icons.Outlined.Search, null)
-                    }, singleLine = true, shape = MaterialTheme.shapes.medium)
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = {
+                            query = it
+                            vm.browse(query = it)
+                        },
+                        modifier = Modifier.fillMaxWidth().focusRequester(
+                            focusRequester
+                        ),
+                        placeholder = {
+                            Text("Search products")
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Search, null)
+                        },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium
+                    )
                 }
             }
         }
@@ -346,7 +356,9 @@ fun ProductScreen(
                 val selling = variant.selling_price.toBigDecimalOrNull() ?: BigDecimal.ZERO
                 if (selling < mrp) {
                     "Save ${rupees((mrp - selling).toPlainString())}"
-                } else null
+                } else {
+                    null
+                }
             }
             savingsText?.let {
                 Text(it, color = Forest)
@@ -425,11 +437,7 @@ fun CartScreen(vm: ShopViewModel, cart: List<CartLine>, checkout: () -> Unit, sh
 }
 
 @Composable
-fun FavouritesScreen(
-    vm: ShopViewModel,
-    cart: List<CartLine>,
-    open: (Int) -> Unit
-) {
+fun FavouritesScreen(vm: ShopViewModel, cart: List<CartLine>, open: (Int) -> Unit) {
     val state = collectShopState(vm)
     LaunchedEffect(Unit) { vm.loadFavourites() }
     if (state.favouritesLoading && state.favourites.isEmpty()) {

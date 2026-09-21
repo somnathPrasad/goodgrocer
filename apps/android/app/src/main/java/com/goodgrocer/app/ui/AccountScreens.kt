@@ -1,5 +1,6 @@
 package com.goodgrocer.app.ui
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,65 +24,83 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.Address
-import kotlinx.coroutines.delay
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(vm: ShopViewModel, done: () -> Unit) {
     val state = collectShopState(vm)
-    var phone by rememberSaveable { mutableStateOf("") }
-    var requestedPhone by rememberSaveable { mutableStateOf<String?>(null) }
-    var code by rememberSaveable { mutableStateOf("") }
-    var cooldown by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(cooldown) {
-        if (cooldown > 0) {
-            delay(1000)
-            cooldown--
-        }
-    }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var signInError by remember { mutableStateOf<String?>(null) }
+    var pickingAccount by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text("Your neighbourhood.\nYour account.", style = MaterialTheme.typography.headlineLarge)
-        Text("Use your phone number to save favourites, manage addresses and place orders.")
-        ShopField("Phone number", phone, {
-            phone = it
-        }, keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        PrimaryButton(
-            if (cooldown >
-                0
-            ) {
-                "Request again in ${cooldown}s"
+        Text(
+            "Sign in to save favourites, manage addresses and place orders. Your contact phone is collected at checkout."
+        )
+        PrimaryButton("Sign in with Google", !state.actionLoading && !pickingAccount) {
+            signInError = null
+            if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()) {
+                signInError = "Google sign-in is not configured for this app."
             } else {
-                "Send verification code"
-            },
-            !state.actionLoading && phone.length >= 10 && cooldown == 0
-        ) {
-            requestedPhone = phone
-            vm.requestOtp(phone)
-            cooldown =
-                60
-        }
-        if (state.otp != null && requestedPhone != null) {
-            Text("Enter the code for $requestedPhone")
-            state.otp.development_code?.let { Text("Development code: $it", color = Forest) }
-            ShopField("6-digit code", code, {
-                code = it.filter(Char::isDigit).take(6)
-            }, keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-            PrimaryButton("Verify & continue", !state.actionLoading && code.length == 6) {
-                vm.verifyOtp(requestedPhone!!, code, done)
+                pickingAccount = true
+                scope.launch {
+                    try {
+                        val option = GetSignInWithGoogleOption.Builder(
+                            BuildConfig.GOOGLE_WEB_CLIENT_ID
+                        ).build()
+                        val request = GetCredentialRequest.Builder().addCredentialOption(
+                            option
+                        ).build()
+                        val credential = CredentialManager.create(
+                            context
+                        ).getCredential(context as Activity, request).credential
+                        if (credential !is CustomCredential ||
+                            credential.type !=
+                            GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                        ) {
+                            signInError = "Choose a Google account to continue."
+                        } else {
+                            val token = GoogleIdTokenCredential.createFrom(credential.data).idToken
+                            vm.googleSignIn(token, done)
+                        }
+                    } catch (_: GetCredentialCancellationException) {
+                        // Dismissing the account picker leaves the customer on this screen.
+                    } catch (_: GetCredentialException) {
+                        signInError = "Google sign-in could not start. Please try again."
+                    } catch (_: GoogleIdTokenParsingException) {
+                        signInError =
+                            "Google sign-in returned an unreadable account. Please try again."
+                    } finally {
+                        pickingAccount = false
+                    }
+                }
             }
         }
-        if (state.actionLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        signInError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (state.actionLoading || pickingAccount) LinearProgressIndicator(Modifier.fillMaxWidth())
     }
 }
 
@@ -90,7 +109,7 @@ fun AccountScreen(signedIn: Boolean, login: () -> Unit, addresses: () -> Unit, l
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         SectionTitle("Your Goodgrocer", "Everyday shopping, a little easier.")
         if (!signedIn) {
-            PrimaryButton("Sign in with your phone", click = login)
+            PrimaryButton("Sign in with Google", click = login)
         } else {
             PrimaryButton("Manage saved addresses", click = addresses)
             OutlinedButton(onClick = logout) { Text("Sign out") }
@@ -107,7 +126,12 @@ fun AddressScreen(vm: ShopViewModel) {
     if (edit !=
         null
     ) {
-        AddressEditor(edit!!, state.addressesLoading || state.actionLoading, { vm.saveAddress(it) { edit = null } }, {
+        AddressEditor(edit!!, state.addressesLoading || state.actionLoading, {
+            vm.saveAddress(it) {
+                edit =
+                    null
+            }
+        }, {
             edit =
                 null
         })

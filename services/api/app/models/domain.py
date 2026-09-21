@@ -95,7 +95,8 @@ class ProductVariant(Timestamp, Base):
 class Customer(Timestamp, Base):
     __tablename__ = "customers"
     id: Mapped[int] = mapped_column(primary_key=True)
-    phone_number: Mapped[str] = mapped_column(String(20), unique=True)
+    phone_number: Mapped[str | None] = mapped_column(String(20), unique=True)
+    google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
 
 
 class Admin(Timestamp, Base):

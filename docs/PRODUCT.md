@@ -4,8 +4,9 @@
 
 One physical Kirana store, approximately 500 products, a native Android customer
 app and a store-owner web portal share one backend. Browsing, search and a
-persistent local cart require no login. Phone OTP authenticates checkout, saved
-addresses, account favourites and orders. Customers can choose delivery or pickup,
+persistent local cart require no login. Google sign-in authenticates checkout, saved
+addresses, account favourites and orders. A contact phone is collected from the
+delivery address or at pickup checkout; it is not an account identifier. Customers can choose delivery or pickup,
 pay COD or UPI on delivery, track status, and reorder at current prices. Online
 UPI has an explicit development integration; production requires a provider.
 
@@ -56,4 +57,4 @@ No iOS, customer web shop, tenants/multi-store, subcategories, inventory counts,
 coupons/promotions/combos, reviews/chat, drivers/tracking, staff roles/RBAC,
 loyalty, order notifications, or distributed infrastructure. Future native iOS
 and multi-store design remain future considerations; no store_id is added now.
-Production SMS, online UPI, deployment and backups require operator configuration.
+Google OAuth client configuration, online UPI, deployment and backups require operator configuration.

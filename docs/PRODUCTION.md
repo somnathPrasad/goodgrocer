@@ -2,17 +2,16 @@
 
 ## External blockers
 
-### Phone OTP
+### Google sign-in
 
-Choose an SMS provider and implement `OTPProvider.send` in
-`services/api/app/services/providers.py`; add an explicit provider setting and
-factory branch. Obtain its credentials through environment/secret management.
-The existing service owns normalization, cryptographic code generation, keyed
-hashing, 5-minute expiry, 5 verification attempts, 60-second resend cooldown and
-per-number/IP hourly limits. A provider must never log codes or return them to
-clients in production. Test delivery failures and provider throttling before
-opening login. `OTP_PROVIDER=disabled` fails with 503; production startup rejects
-`development`.
+Create Google OAuth clients for the Android package and release signing
+certificate, plus a web client for the backend audience. Set the same web client
+ID as Android's `-PGOOGLE_WEB_CLIENT_ID=...` Gradle property and the API's
+`GOOGLE_WEB_CLIENT_ID` environment variable. The backend verifies Google ID
+tokens before issuing its own sessions. Production startup requires the web
+client ID. Test on an Android device with Google Play services and the release
+signing certificate before opening login. Contact phones are collected for
+fulfilment and are not treated as verified identity.
 
 ### Online UPI
 
@@ -33,7 +32,7 @@ can cancel; the customer may reorder. No money is transferred.
 
 ## Deployment checklist
 
-- Set `ENVIRONMENT=production`, disable development providers, set a random
+- Set `ENVIRONMENT=production`, disable development payment provider, set a random
   `SECRET_KEY` (for example generate locally with `openssl rand -hex 32`),
   and use HTTPS for `PUBLIC_API_URL` and exact `ADMIN_ORIGIN`.
 - Use unique database credentials and private database networking. The Compose
@@ -54,7 +53,7 @@ can cancel; the customer may reorder. No money is transferred.
   retained; add an operator cleanup process after deciding retention, never delete
   historical references indiscriminately.
 - Schedule database/media backups and practice restore. Establish log rotation
-  and retention, session/rate-limit/expired-OTP cleanup and operational alerts.
+  and retention, session/rate-limit/legacy-OTP cleanup and operational alerts.
   Request logs contain method/path/status/duration/request ID, not auth bodies.
 - Configure the Android HTTPS API URL, release signing and store distribution.
   Test on physical devices, TalkBack, larger text and unreliable networks.
@@ -63,5 +62,5 @@ can cancel; the customer may reorder. No money is transferred.
   APIs. The owner must record received COD/UPI payments explicitly.
 
 Infrastructure provisioning, release signing, a full penetration test, production
-load testing and real SMS/payment certification are not delivered by a local V1.
+load testing and real payment certification are not delivered by a local V1.
 No order notification provider is implemented or required.

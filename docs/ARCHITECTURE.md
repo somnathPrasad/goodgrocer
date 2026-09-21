@@ -26,8 +26,11 @@ hidden; active unavailable products remain visible. Search uses PostgreSQL ILIKE
 
 Customer and admin sessions are opaque random tokens, stored as hashes with
 expiry and explicit logout. Admin credentials use Argon2 and a prompted bootstrap
-command. OTPs use keyed hashes, expiry, attempt limits and PostgreSQL-backed
-rate limits. No Redis, roles or service decomposition.
+command. Android obtains a Google ID token through Credential Manager; FastAPI
+verifies its signature, issuer, audience and expiry using Google's auth library
+and keys customers by the stable `sub` claim. The backend rate limits exchanges.
+Contact phone numbers belong to delivery addresses or pickup orders. No Redis,
+roles or service decomposition.
 
 Checkout produces a signed, expiring quote. Order creation revalidates it while
 locking involved product/variant rows, serializes submissions per customer and
@@ -53,12 +56,12 @@ TypeScript types. Android uses explicit Moshi DTOs, verified by tests/builds.
 
 ## External services
 
-Protocols isolate OTP delivery, payment attempts and image storage. Development
+Protocols isolate payment attempts and image storage. Development
 providers run only outside production. Local development and tests re-encode
 media and store it on disk, with `/media` references in the database. Production
 uses an explicitly selected Supabase Storage adapter while preserving the same
 validation and re-encoding boundary. Local seed media is not promoted or migrated
-to production. No production SMS/payment provider or hosting provider has been
+to production. No production payment provider or hosting provider has been
 selected; see `PRODUCTION.md`.
 
 ## Future considerations

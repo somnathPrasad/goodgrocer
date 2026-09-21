@@ -2,7 +2,7 @@
 
 A single-store grocery ordering app: native Android shopping, a Next.js owner
 portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
-basket, sign in by phone OTP, save addresses/favourites, order for delivery or
+basket, sign in with Google, save addresses/favourites, order for delivery or
 pickup, track orders and reorder. The owner manages catalogue/images/availability
 and incoming orders. No customer web storefront or inventory quantity tracking.
 
@@ -91,7 +91,8 @@ Alternatively set `ANDROID_HOME` to your SDK installation and run:
 ```sh
 # macOS default; on Linux commonly "$HOME/Android/Sdk"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-./apps/android/gradlew -p apps/android :app:assembleDebug :app:installDebug
+./apps/android/gradlew -p apps/android :app:assembleDebug :app:installDebug \
+  -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
 ```
 
 The default emulator API URL is `http://10.0.2.2:8000/` (the host computer).
@@ -99,24 +100,29 @@ For a USB device, use `adb reverse` and a different build URL:
 
 ```sh
 adb reverse tcp:8000 tcp:8000
-./apps/android/gradlew -p apps/android :app:installDebug -PAPI_URL=http://127.0.0.1:8000/
+./apps/android/gradlew -p apps/android :app:installDebug \
+  -PAPI_URL=http://127.0.0.1:8000/ \
+  -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
 ```
 
 API URLs require a trailing slash. Cleartext HTTP is permitted only in debug
 builds. Release builds require an HTTPS endpoint and your own signing setup:
 
 ```sh
-./apps/android/gradlew -p apps/android :app:assembleRelease -PAPI_URL=https://api.example.com/
+./apps/android/gradlew -p apps/android :app:assembleRelease \
+  -PAPI_URL=https://api.example.com/ \
+  -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
 ```
 
-### Development OTP and payments
+### Google sign-in and development payments
 
-Browse and fill the basket without signing in. At checkout, enter a 10-digit
-Indian mobile number or international `+` number. Request a code; the development
-code appears on the login screen and in the API response. It expires in five
-minutes, permits five verification attempts, and cannot be reused. Resends have
-a 60-second cooldown, five requests per number per hour, and an IP limit.
-Production configuration rejects this provider.
+Browse and fill the basket without signing in. For customer accounts, configure a
+Google OAuth web client ID in `GOOGLE_WEB_CLIENT_ID` for the API and pass the same
+ID to the Android build with `-PGOOGLE_WEB_CLIENT_ID=...`. Configure an Android
+OAuth client for `com.goodgrocer.app` and the signing certificate fingerprints.
+The Android app obtains an ID token through Credential Manager; the API verifies
+it and issues the app session. Enter a contact phone in the delivery address or
+at pickup checkout. Production requires the web client ID.
 
 COD and UPI on delivery/collection work without payment credentials. The owner
 marks payment received independently of delivery status. Online UPI is clearly
@@ -133,8 +139,8 @@ Root `.env` is read independently of the current working directory:
 | `DATABASE_URL` | SQLAlchemy `postgresql+psycopg://…` connection |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Docker PostgreSQL credentials; sample values are local only |
 | `ENVIRONMENT` | `development`, `test` or `production` |
-| `SECRET_KEY` | Signs quotes and keyed OTP hashes; replace with a random secret for production |
-| `OTP_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
+| `SECRET_KEY` | Signs checkout quotes; replace with a random secret for production |
+| `GOOGLE_WEB_CLIENT_ID` | Google OAuth web client ID used as the API token audience; required in production |
 | `PAYMENT_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
 | `IMAGE_STORAGE_PROVIDER` | `local` for development/tests; production requires `supabase` |
 | `SUPABASE_URL` | Supabase project HTTPS URL; required for Supabase image storage |
@@ -185,7 +191,7 @@ To run the built portal: `npm run start --prefix apps/admin-web`.
 Important routes (prefix `/api/v1`):
 
 - `GET /config`, `/categories`, `/brands`, `/products`, `/products/{id}`
-- `POST /auth/otp/request`, `/auth/otp/verify`, `/auth/logout`
+- `POST /auth/google`, `/auth/logout`
 - `GET/POST /addresses`, `PUT/DELETE /addresses/{id}`
 - `GET /favourites`, `PUT/DELETE /favourites/{product_id}`
 - `POST /checkout/quote`, `POST /orders`, `GET /orders`, `/orders/{id}`
@@ -215,8 +221,8 @@ Verification results and tested limits: [docs/VERIFICATION.md](docs/VERIFICATION
 
 ## Production boundaries
 
-See [production configuration](docs/PRODUCTION.md). Real SMS delivery and online
-UPI require selected providers and credentials **plus adapter implementation**.
+See [production configuration](docs/PRODUCTION.md). Online
+UPI requires a selected provider and credentials **plus adapter implementation**.
 The shipped development providers cannot run in production. Before public use,
 configure TLS, a random secret, database credentials, Supabase Storage/backups,
 release signing and store-specific delivery fee/pickup instructions. This repo

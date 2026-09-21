@@ -27,9 +27,7 @@ data class Product(
 data class ProductPage(val items: List<Product>, val total: Int, val page: Int, val page_size: Int)
 data class CartLine(val product: Product, val variant: Variant, val quantity: Int)
 data class CartItem(val variant_id: Int, val quantity: Int)
-data class PhoneRequest(val phone_number: String)
-data class VerifyRequest(val phone_number: String, val code: String)
-data class OtpResult(val message: String, val development_code: String?)
+data class GoogleLoginRequest(val id_token: String)
 data class AuthToken(val token: String, val expires_at: String)
 data class Address(
     val id: Int? = null,
@@ -47,7 +45,8 @@ data class CheckoutRequest(
     val items: List<CartItem>,
     val fulfilment_type: String,
     val payment_method: String,
-    val address_id: Int? = null
+    val address_id: Int? = null,
+    val contact_phone: String? = null
 )
 data class OrderRequest(
     val items: List<CartItem>,
@@ -55,7 +54,8 @@ data class OrderRequest(
     val payment_method: String,
     val address_id: Int?,
     val quote_token: String,
-    val idempotency_key: String
+    val idempotency_key: String,
+    val contact_phone: String? = null
 )
 data class Quote(
     val items: List<OrderItem>,
