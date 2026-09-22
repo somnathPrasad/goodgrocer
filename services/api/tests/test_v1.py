@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 from pydantic import ValidationError
 
+from app.api.routes import v1
 from app.core.config import Settings
 from app.models.domain import Address, Customer, Order, OrderItem, PaymentAttempt, now
 from app.schemas.domain import ProductInput, VariantInput
@@ -274,6 +275,42 @@ def test_auth_and_ownership(client, data):
         ]["line1"]
         == "12 Market Road"
     )
+
+
+def test_reverse_geocode_suggests_fields_for_confirmed_pin(client, data, monkeypatch):
+    class GoogleResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "status": "OK",
+                "results": [
+                    {
+                        "address_components": [
+                            {"long_name": "Market Road", "types": ["route"]},
+                            {"long_name": "Indiranagar", "types": ["sublocality_level_1"]},
+                            {"long_name": "Bengaluru", "types": ["locality"]},
+                            {"long_name": "Karnataka", "types": ["administrative_area_level_1"]},
+                            {"long_name": "560038", "types": ["postal_code"]},
+                        ]
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(v1, "get_settings", lambda: Settings(google_geocoding_api_key="test-key"))
+    monkeypatch.setattr(v1.httpx, "get", lambda *args, **kwargs: GoogleResponse())
+    path = "/api/v1/addresses/reverse-geocode?latitude=12.9&longitude=77.6"
+    assert client.get(path).status_code == 401
+    result = client.get(path, headers=data["headers"])
+    assert result.status_code == 200, result.text
+    assert result.json() == {
+        "line1": "Market Road",
+        "locality": "Indiranagar",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "postal_code": "560038",
+    }
 
 
 def test_favourites_are_unique_and_owned(client, data):

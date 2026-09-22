@@ -251,3 +251,29 @@ session returns to the entry screen. Keep the basket in private local storage.
 Customers must sign in before browsing in the Android app. The catalogue API
 remains public; this is an app entry policy, not a backend authorization change.
 Google OAuth configuration is needed to complete sign-in on a device.
+
+## ADR-010: Use Google Maps for customer delivery pins
+
+- Date: 2026-09-22
+- Status: Accepted
+
+### Context
+
+The address form asks customers to type many fields. A movable delivery pin and
+suggested address can reduce typing, while a store owner still needs a usable
+written address for delivery and manual serviceability decisions.
+
+### Decision
+
+Use Google Maps SDK for Android in the customer address editor. Let customers
+move a pin, reverse geocode the confirmed location through FastAPI, and review
+and complete the address before saving. Keep manual entry. Store the pin in the
+existing address latitude and longitude fields; no routing, geofencing or
+automatic serviceability checks are introduced.
+
+### Consequences
+
+Operators configure separate Google Maps Android and server Geocoding keys,
+billing and quotas, and a map center near the store. Geocoding is only a
+suggestion; customers must supply a house or street and contact details. The
+Google service may be unavailable, so manual entry remains functional.

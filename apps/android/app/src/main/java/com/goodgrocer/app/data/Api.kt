@@ -34,6 +34,12 @@ interface Api {
     @GET("api/v1/addresses")
     suspend fun addresses(): List<Address>
 
+    @GET("api/v1/addresses/reverse-geocode")
+    suspend fun reverseGeocode(
+        @Query("latitude") latitude: String,
+        @Query("longitude") longitude: String
+    ): AddressSuggestion
+
     @POST("api/v1/addresses")
     suspend fun createAddress(@Body address: Address): Address
 

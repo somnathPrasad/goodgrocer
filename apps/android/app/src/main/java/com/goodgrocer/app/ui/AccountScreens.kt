@@ -30,7 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.Address
+import com.goodgrocer.app.data.AddressSuggestion
+import com.google.android.gms.maps.model.LatLng
 
 @Composable
 fun AccountScreen(signedIn: Boolean, login: () -> Unit, addresses: () -> Unit, logout: () -> Unit) {
@@ -54,7 +57,7 @@ fun AddressScreen(vm: ShopViewModel) {
     if (edit !=
         null
     ) {
-        AddressEditor(edit!!, state.addressesLoading || state.actionLoading, {
+        AddressEditor(edit!!, state.addressesLoading || state.actionLoading, vm::reverseGeocode, {
             vm.saveAddress(it) {
                 edit =
                     null
@@ -125,7 +128,13 @@ fun AddressScreen(vm: ShopViewModel) {
 }
 
 @Composable
-fun AddressEditor(initial: Address, busy: Boolean, save: (Address) -> Unit, cancel: () -> Unit) {
+fun AddressEditor(
+    initial: Address,
+    busy: Boolean,
+    lookup: (String, String, (AddressSuggestion?) -> Unit) -> Unit,
+    save: (Address) -> Unit,
+    cancel: () -> Unit
+) {
     var name by rememberSaveable(initial.id) { mutableStateOf(initial.recipient_name) }
     var phone by rememberSaveable(initial.id) { mutableStateOf(initial.phone) }
     var line1 by rememberSaveable(initial.id) { mutableStateOf(initial.line1) }
@@ -135,34 +144,80 @@ fun AddressEditor(initial: Address, busy: Boolean, save: (Address) -> Unit, canc
     var city by rememberSaveable(initial.id) { mutableStateOf(initial.city) }
     var region by rememberSaveable(initial.id) { mutableStateOf(initial.state) }
     var postal by rememberSaveable(initial.id) { mutableStateOf(initial.postal_code.orEmpty()) }
+    var latitude by rememberSaveable(initial.id) { mutableStateOf(initial.latitude) }
+    var longitude by rememberSaveable(initial.id) { mutableStateOf(initial.longitude) }
+    var showMap by rememberSaveable(initial.id) {
+        mutableStateOf(BuildConfig.MAPS_ENABLED && initial.id == null)
+    }
+    var moreDetails by rememberSaveable(initial.id) { mutableStateOf(false) }
+    var lookupMessage by remember { mutableStateOf<String?>(null) }
+    if (showMap) {
+        MapPinPicker(
+            initial = LatLng(
+                latitude?.toDoubleOrNull() ?: BuildConfig.STORE_LATITUDE,
+                longitude?.toDoubleOrNull() ?: BuildConfig.STORE_LONGITUDE
+            ),
+            confirm = { point ->
+                latitude = point.latitude.toString()
+                longitude = point.longitude.toString()
+                showMap = false
+                lookupMessage = "Looking up the pinned area…"
+                lookup(latitude!!, longitude!!) { suggestion ->
+                    if (suggestion == null) {
+                        lookupMessage = "Could not suggest an address. Enter the details below."
+                    } else {
+                        if (suggestion.line1.isNotBlank()) line1 = suggestion.line1
+                        locality = suggestion.locality
+                        city = suggestion.city
+                        region = suggestion.state
+                        postal = suggestion.postal_code
+                        lookupMessage =
+                            "Check the suggested address and add your house or flat number."
+                    }
+                }
+            },
+            cancel = { showMap = false }
+        )
+        return
+    }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         SectionTitle(if (initial.id == null) "Add an address" else "Edit address")
+        if (BuildConfig.MAPS_ENABLED) {
+            OutlinedButton(onClick = { showMap = true }, enabled = !busy) {
+                Text(if (latitude == null) "Choose location on map" else "Move saved pin")
+            }
+            if (latitude != null) Text("Delivery pin selected")
+        }
+        lookupMessage?.let { Text(it) }
         ShopField("Recipient name", name, { name = it })
         ShopField("Phone", phone, {
             phone = it
         }, keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        ShopField("House / street", line1, {
+        ShopField("House / flat number and street", line1, {
             line1 =
                 it
         })
-        ShopField("Address line 2 (optional)", line2, { line2 = it })
         ShopField("Landmark (optional)", landmark, {
             landmark =
                 it
         })
-        ShopField("Locality (optional)", locality, { locality = it })
+        if (locality.isNotBlank()) Text("Area: $locality")
         ShopField("City / town", city, {
             city =
                 it
         })
         ShopField("State", region, { region = it })
-        ShopField("Postal code (optional)", postal, {
-            postal =
-                it
-        })
+        TextButton(onClick = { moreDetails = !moreDetails }) {
+            Text(if (moreDetails) "Fewer details" else "More address details")
+        }
+        if (moreDetails) {
+            ShopField("Address line 2 (optional)", line2, { line2 = it })
+            ShopField("Locality (optional)", locality, { locality = it })
+            ShopField("Postal code (optional)", postal, { postal = it })
+        }
         PrimaryButton(
             "Save address",
             !busy &&
@@ -182,7 +237,8 @@ fun AddressEditor(initial: Address, busy: Boolean, save: (Address) -> Unit, canc
                     locality = locality.ifBlank {
                         null
                     },
-                    city = city, state = region, postal_code = postal.ifBlank { null }
+                    city = city, state = region, postal_code = postal.ifBlank { null },
+                    latitude = latitude, longitude = longitude
                 )
             )
         }

@@ -47,7 +47,10 @@ cash is received, independently of delivery status. The first release accepts
 delivery and COD only; pickup and other payment methods are disabled.
 
 Delivery serviceability is decided manually by the owner, who may cancel an
-unserviceable order. No maps, geofences, routing or automatic address validation.
+unserviceable order. Customers can select a delivery pin on Google Maps and
+confirm an address suggested from that location, or enter the address manually.
+The pin and suggested text do not establish serviceability. No geofences, routing
+or automatic address validation.
 Delivery fee is configurable (default zero), with no minimum order or discounts.
 
 ## Owner apps

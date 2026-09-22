@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     secret_key: str = "local-development-only-change-before-production"
     google_web_client_id: str | None = None
+    google_geocoding_api_key: SecretStr | None = None
     payment_provider: Literal["development", "disabled"] = "development"
     image_storage_provider: Literal["local", "supabase"] = "local"
     media_dir: Path = Path(__file__).resolve().parents[2] / "media"

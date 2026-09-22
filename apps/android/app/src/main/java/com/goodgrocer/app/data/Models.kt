@@ -39,7 +39,16 @@ data class Address(
     val locality: String? = null,
     val city: String = "",
     val state: String = "",
-    val postal_code: String? = null
+    val postal_code: String? = null,
+    val latitude: String? = null,
+    val longitude: String? = null
+)
+data class AddressSuggestion(
+    val line1: String = "",
+    val locality: String = "",
+    val city: String = "",
+    val state: String = "",
+    val postal_code: String = ""
 )
 data class CheckoutRequest(
     val items: List<CartItem>,

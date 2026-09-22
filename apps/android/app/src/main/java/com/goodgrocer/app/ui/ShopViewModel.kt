@@ -7,6 +7,7 @@ import androidx.credentials.exceptions.ClearCredentialException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.goodgrocer.app.data.Address
+import com.goodgrocer.app.data.AddressSuggestion
 import com.goodgrocer.app.data.CartItem
 import com.goodgrocer.app.data.CartLine
 import com.goodgrocer.app.data.Category
@@ -100,6 +101,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = block(_state.value)
     }
     fun clearMessage() = change { it.copy(error = null, message = null) }
+    fun reverseGeocode(latitude: String, longitude: String, done: (AddressSuggestion?) -> Unit) =
+        task {
+            val suggestion = runCatching {
+                repository.api.reverseGeocode(latitude, longitude)
+            }.getOrNull()
+            done(suggestion)
+        }
     private fun failure(error: Exception) {
         val message = if (error is HttpException) {
             runCatching {

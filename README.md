@@ -115,6 +115,16 @@ builds. Release builds require an HTTPS endpoint and your own signing setup:
   -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
 ```
 
+To enable the delivery pin picker, enable Maps SDK for Android and Geocoding API
+in a billed Google Maps Platform project. Add `GOOGLE_GEOCODING_API_KEY` to the
+API environment or ignored root `.env`. Set `GOOGLE_MAPS_API_KEY` in ignored
+`apps/android/local.properties`, or pass `-PGOOGLE_MAPS_API_KEY=...` at build time.
+Set `STORE_LATITUDE` and `STORE_LONGITUDE` in either place to the store's location.
+Restrict the Android key to `com.goodgrocer.app` and its signing certificate,
+and the Geocoding key to the API server and Geocoding API. Without the Android
+key, customers can still enter addresses manually. The map center should be set
+near the store before enabling the picker.
+
 ### Admin Android
 
 Open `apps/admin-android` as a separate Android Studio project and run `app`.
@@ -154,6 +164,7 @@ Root `.env` is read independently of the current working directory:
 | `ENVIRONMENT` | `development`, `test` or `production` |
 | `SECRET_KEY` | Signs checkout quotes; replace with a random secret for production |
 | `GOOGLE_WEB_CLIENT_ID` | Google OAuth web client ID used as the API token audience; required in production |
+| `GOOGLE_GEOCODING_API_KEY` | Server-side key for Google Geocoding address suggestions; optional for manual addresses |
 | `PAYMENT_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
 | `IMAGE_STORAGE_PROVIDER` | `local` for development/tests; production requires `supabase` |
 | `SUPABASE_URL` | Supabase project HTTPS URL; required for Supabase image storage |

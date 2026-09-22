@@ -1,6 +1,11 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
 }
 android {
     namespace = "com.goodgrocer.app"
@@ -20,6 +25,22 @@ android {
             "String",
             "GOOGLE_WEB_CLIENT_ID",
             "\"${providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").getOrElse("")}\""
+        )
+        val mapsKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
+            .getOrElse(localProperties.getProperty("GOOGLE_MAPS_API_KEY", ""))
+        manifestPlaceholders["googleMapsApiKey"] = mapsKey
+        buildConfigField("boolean", "MAPS_ENABLED", mapsKey.isNotBlank().toString())
+        buildConfigField(
+            "double",
+            "STORE_LATITUDE",
+            providers.gradleProperty("STORE_LATITUDE")
+                .getOrElse(localProperties.getProperty("STORE_LATITUDE", "20.5937"))
+        )
+        buildConfigField(
+            "double",
+            "STORE_LONGITUDE",
+            providers.gradleProperty("STORE_LONGITUDE")
+                .getOrElse(localProperties.getProperty("STORE_LONGITUDE", "78.9629"))
         )
     }
     buildFeatures {
@@ -50,6 +71,8 @@ dependencies {
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
+    implementation("com.google.android.gms:play-services-maps:20.0.0")
+    implementation("com.google.android.gms:play-services-location:21.4.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }

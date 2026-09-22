@@ -1,7 +1,9 @@
 from datetime import datetime, time
+from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 
+import httpx
 from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -108,6 +110,54 @@ def addresses(current: Customer = Depends(customer), db: Session = Depends(get_d
     return db.scalars(
         select(Address).where(Address.customer_id == current.id).order_by(Address.id)
     ).all()
+
+
+@router.get("/addresses/reverse-geocode", tags=["customer"])
+def reverse_geocode(
+    latitude: Decimal = Query(ge=-90, le=90),
+    longitude: Decimal = Query(ge=-180, le=180),
+    current: Customer = Depends(customer),
+    db: Session = Depends(get_db),
+):
+    key = get_settings().google_geocoding_api_key
+    if key is None:
+        raise DomainError("MAPS_NOT_CONFIGURED", "Address lookup is unavailable.", 503)
+    auth.rate_limit(db, f"geocode-customer:{current.id}", 100, 86400)
+    try:
+        response = httpx.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={
+                "latlng": f"{latitude},{longitude}",
+                "key": key.get_secret_value(),
+                "language": "en",
+                "region": "in",
+            },
+            timeout=5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise DomainError("ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502) from exc
+    if payload.get("status") == "ZERO_RESULTS":
+        return {"line1": "", "locality": "", "city": "", "state": "", "postal_code": ""}
+    if payload.get("status") != "OK" or not payload.get("results"):
+        raise DomainError("ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502)
+    components = payload["results"][0].get("address_components", [])
+
+    def component(*types: str) -> str:
+        for kind in types:
+            for item in components:
+                if kind in item.get("types", []):
+                    return item.get("long_name", "")
+        return ""
+
+    return {
+        "line1": " ".join(filter(None, [component("street_number"), component("route")])),
+        "locality": component("sublocality_level_1", "sublocality", "neighborhood"),
+        "city": component("locality", "administrative_area_level_3", "administrative_area_level_2"),
+        "state": component("administrative_area_level_1"),
+        "postal_code": component("postal_code"),
+    }
 
 
 @router.post("/addresses", response_model=AddressOut, status_code=201, tags=["customer"])

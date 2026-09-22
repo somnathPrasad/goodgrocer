@@ -61,6 +61,12 @@ sessions. Session material is
 AES-GCM encrypted using Android Keystore; backups are disabled. Checkout keys
 persist for retry safety. Money uses BigDecimal. Order details refresh every
 15 seconds while visible. Images use Coil caching and fixed-size placeholders.
+The customer address editor optionally embeds Google Maps SDK for Android. The
+user moves a center pin, then the customer API calls Google Geocoding once to
+suggest address fields. The API holds the Geocoding key; the Android Maps key is
+restricted to the app. Coordinates and confirmed text use the existing address
+API and columns. Manual entry remains available. The owner still decides
+delivery serviceability.
 
 OpenAPI is exported to `packages/api-contracts`; admin web consumes generated
 TypeScript types. Both Android apps use explicit Moshi DTOs, verified by builds.
