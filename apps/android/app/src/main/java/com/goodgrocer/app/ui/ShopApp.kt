@@ -288,9 +288,14 @@ fun ShopApp(vm: ShopViewModel) {
                 }
             }
             composable("account") {
-                AccountScreen(signedIn, {
-                    authenticated("account")
-                }, { authenticated("addresses") }, { vm.logout() })
+                AccountScreen(
+                    signedIn = signedIn,
+                    login = { authenticated("account") },
+                    onAddresses = { authenticated("addresses") },
+                    onOrders = { authenticated("orders") },
+                    onFavourites = { authenticated("favourites") },
+                    logout = { vm.logout() }
+                )
             }
         }
     }
