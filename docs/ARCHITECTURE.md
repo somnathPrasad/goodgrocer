@@ -52,8 +52,10 @@ token is AES-GCM encrypted with an Android Keystore key in private preferences;
 backups are disabled. The browser login continues to use its cookie and Origin
 check. The admin Android app polls dashboard and orders every 30 seconds.
 
-Android uses UI → ViewModel → Repository → API/local storage. The basket persists
-in private preferences and remains usable without login. Session material is
+Android uses UI → ViewModel → Repository → API/local storage. The customer app
+opens at a Google sign-in entry screen when no session is stored, then gives
+access to catalogue and basket. The basket persists in private preferences across
+sessions. Session material is
 AES-GCM encrypted using Android Keystore; backups are disabled. Checkout keys
 persist for retry safety. Money uses BigDecimal. Order details refresh every
 15 seconds while visible. Images use Coil caching and fixed-size placeholders.

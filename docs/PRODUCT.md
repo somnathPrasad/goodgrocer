@@ -3,9 +3,10 @@
 ## V1 scope
 
 One physical Kirana store, approximately 500 products, a native Android customer
-app, a native Android owner app and the retained store-owner web portal share one backend. Browsing, search and a
-persistent local cart require no login. Google sign-in authenticates checkout, saved
-addresses, account favourites and orders. A contact phone is collected from the
+app, a native Android owner app and the retained store-owner web portal share one backend. The
+customer Android app opens with Google sign-in. After sign-in, customers can browse,
+search and use a persistent local cart. Google sign-in also authenticates checkout,
+saved addresses, account favourites and orders. A contact phone is collected from the
 delivery address or at pickup checkout; it is not an account identifier. Customers can choose delivery or pickup,
 pay COD or UPI on delivery, track status, and reorder at current prices. Online
 UPI has an explicit development integration; production requires a provider.

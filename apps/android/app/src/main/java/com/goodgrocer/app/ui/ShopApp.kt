@@ -55,12 +55,21 @@ fun ShopApp(vm: ShopViewModel) {
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
-    val route = entry?.destination?.route ?: "home"
+    val startDestination = remember { if (signedIn) "home" else "entry" }
+    val route = entry?.destination?.route ?: startDestination
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it, duration = SnackbarDuration.Long)
             vm.clearMessage()
+        }
+    }
+    LaunchedEffect(signedIn, entry?.destination?.route) {
+        if (!signedIn && entry != null && route != "entry") {
+            nav.navigate("entry") {
+                popUpTo(nav.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
         }
     }
     val navigate: (String) -> Unit = { destination ->
@@ -72,18 +81,15 @@ fun ShopApp(vm: ShopViewModel) {
     val authenticated: (
         String
     ) -> Unit = { destination ->
-        navigate(if (signedIn) destination else "login?next=$destination")
+        navigate(if (signedIn) destination else "entry")
     }
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
-        if (route !=
-            "home"
-        ) {
+        if (route != "home" && route != "entry") {
             TopAppBar(title = {
                 Text(
                     when {
                         route.startsWith("product") -> "From your store"
                         route.startsWith("category") -> "Shop by aisle"
-                        route.startsWith("login") -> "Sign in"
                         route.startsWith("order/") -> "Your order"
                         else -> route.replaceFirstChar { it.uppercase() }
                     }
@@ -106,7 +112,7 @@ fun ShopApp(vm: ShopViewModel) {
         Column {
             if (cart.isNotEmpty() &&
                 route !in listOf("cart", "checkout") &&
-                !route.startsWith("login")
+                route != "entry"
             ) {
                 val basketSummary = remember(cart) {
                     val count = cart.sumOf { it.quantity }
@@ -159,9 +165,17 @@ fun ShopApp(vm: ShopViewModel) {
     }) { padding ->
         NavHost(
             navController = nav,
-            startDestination = "home",
+            startDestination = startDestination,
             modifier = Modifier.padding(padding)
         ) {
+            composable("entry") {
+                EntryScreen(vm) {
+                    nav.navigate("home") {
+                        popUpTo("entry") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
             composable("home") {
                 CatalogueScreen(vm, cart, home = true, open = {
                     navigate("product/$it")
@@ -209,22 +223,6 @@ fun ShopApp(vm: ShopViewModel) {
             }
             composable("cart") {
                 CartScreen(vm, cart, { authenticated("checkout") }, { navigate("home") })
-            }
-            composable(
-                "login?next={next}",
-                arguments = listOf(
-                    navArgument("next") {
-                        defaultValue =
-                            "account"
-                    }
-                )
-            ) { page ->
-                LoginScreen(vm) {
-                    val next =
-                        page.arguments?.getString("next") ?: "account"
-                    nav.popBackStack()
-                    navigate(next)
-                }
             }
             composable("favourites") {
                 if (!signedIn) {

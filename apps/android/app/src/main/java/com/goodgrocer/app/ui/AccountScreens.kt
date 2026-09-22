@@ -1,6 +1,5 @@
 package com.goodgrocer.app.ui
 
-import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,83 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.GetCredentialException
-import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.Address
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
-import kotlinx.coroutines.launch
-
-@Composable
-fun LoginScreen(vm: ShopViewModel, done: () -> Unit) {
-    val state = collectShopState(vm)
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var signInError by remember { mutableStateOf<String?>(null) }
-    var pickingAccount by remember { mutableStateOf(false) }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Text("Your neighbourhood.\nYour account.", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "Sign in to save favourites, manage addresses and place orders. Your contact phone is collected at checkout."
-        )
-        PrimaryButton("Sign in with Google", !state.actionLoading && !pickingAccount) {
-            signInError = null
-            if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()) {
-                signInError = "Google sign-in is not configured for this app."
-            } else {
-                pickingAccount = true
-                scope.launch {
-                    try {
-                        val option = GetSignInWithGoogleOption.Builder(
-                            BuildConfig.GOOGLE_WEB_CLIENT_ID
-                        ).build()
-                        val request = GetCredentialRequest.Builder().addCredentialOption(
-                            option
-                        ).build()
-                        val credential = CredentialManager.create(
-                            context
-                        ).getCredential(context as Activity, request).credential
-                        if (credential !is CustomCredential ||
-                            credential.type !=
-                            GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                        ) {
-                            signInError = "Choose a Google account to continue."
-                        } else {
-                            val token = GoogleIdTokenCredential.createFrom(credential.data).idToken
-                            vm.googleSignIn(token, done)
-                        }
-                    } catch (_: GetCredentialCancellationException) {
-                        // Dismissing the account picker leaves the customer on this screen.
-                    } catch (_: GetCredentialException) {
-                        signInError = "Google sign-in could not start. Please try again."
-                    } catch (_: GoogleIdTokenParsingException) {
-                        signInError =
-                            "Google sign-in returned an unreadable account. Please try again."
-                    } finally {
-                        pickingAccount = false
-                    }
-                }
-            }
-        }
-        signInError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (state.actionLoading || pickingAccount) LinearProgressIndicator(Modifier.fillMaxWidth())
-    }
-}
 
 @Composable
 fun AccountScreen(signedIn: Boolean, login: () -> Unit, addresses: () -> Unit, logout: () -> Unit) {

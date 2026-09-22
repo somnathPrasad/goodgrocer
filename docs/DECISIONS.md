@@ -227,3 +227,27 @@ disable backups. Keep browser cookie login and its Origin checks unchanged.
 The backend supports two admin session transports, each restricted to admin
 sessions. The web portal remains functional. Android release builds need an
 HTTPS API URL and signing configuration; app distribution is operator-managed.
+
+## ADR-009: Open the customer app with Google sign-in
+
+- Date: 2026-09-22
+- Status: Accepted
+
+### Context
+
+The customer app currently opens directly to the catalogue. The entry experience
+should establish the customer's Google account before shopping while preserving
+the existing catalogue and basket features.
+
+### Decision
+
+Show a dedicated entry screen when no customer session is stored. Its Google
+button requests accounts through Credential Manager's native bottom sheet. After
+authentication, navigate to the existing catalogue. Signing out or losing a
+session returns to the entry screen. Keep the basket in private local storage.
+
+### Consequences
+
+Customers must sign in before browsing in the Android app. The catalogue API
+remains public; this is an app entry policy, not a backend authorization change.
+Google OAuth configuration is needed to complete sign-in on a device.
