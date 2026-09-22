@@ -7,9 +7,13 @@ app, a native Android owner app and the retained store-owner web portal share on
 customer Android app opens with Google sign-in. After sign-in, customers can browse,
 search and use a persistent local cart. Google sign-in also authenticates checkout,
 saved addresses, account favourites and orders. A contact phone is collected from the
-delivery address or at pickup checkout; it is not an account identifier. Customers can choose delivery or pickup,
-pay COD or UPI on delivery, track status, and reorder at current prices. Online
-UPI has an explicit development integration; production requires a provider.
+delivery address; it is not an account identifier. In the first release, customers
+place delivery orders with cash on delivery (COD), track status, and reorder at
+current prices. Store pickup, UPI on delivery and online UPI remain implemented
+but are hidden from checkout and rejected by the API for this release.
+Existing orders using those methods remain visible and can complete their
+recorded owner and customer workflows. Reordering copies items into the cart;
+the new checkout uses the first-release delivery and COD rule.
 
 ## Catalogue
 
@@ -36,10 +40,11 @@ Exact order states and transitions:
 - OUT_FOR_DELIVERY → DELIVERED or CANCELLED
 - DELIVERED and CANCELLED are terminal
 
-Pickup additionally permits ACCEPTED → DELIVERED when collected. No PACKING.
+Existing pickup orders additionally permit ACCEPTED → DELIVERED when collected. No PACKING.
 Cancellation requires a reason. Cancellation of a paid online order is blocked
-until a production refund integration exists. COD/UPI-on-delivery is marked PAID
-by the owner when payment is received, independently of delivery status.
+until a production refund integration exists. COD is marked PAID by the owner when
+cash is received, independently of delivery status. The first release accepts
+delivery and COD only; pickup and other payment methods are disabled.
 
 Delivery serviceability is decided manually by the owner, who may cancel an
 unserviceable order. No maps, geofences, routing or automatic address validation.

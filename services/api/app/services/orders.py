@@ -36,6 +36,18 @@ def signer():
 
 
 def resolve(db, customer, data, lock=False):
+    if data.fulfilment_type != "DELIVERY":
+        raise DomainError(
+            "FULFILMENT_UNAVAILABLE",
+            "Store pickup is not available for this release.",
+            422,
+        )
+    if data.payment_method != "COD":
+        raise DomainError(
+            "PAYMENT_METHOD_UNAVAILABLE",
+            "Only cash payment is available for this release.",
+            422,
+        )
     if data.payment_method == "ONLINE_UPI":
         payment_provider()
     snapshot = None

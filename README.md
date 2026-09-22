@@ -2,8 +2,8 @@
 
 A single-store grocery ordering app: native Android shopping and owner apps,
 a retained Next.js owner portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
-basket, sign in with Google, save addresses/favourites, order for delivery or
-pickup, track orders and reorder. The owner manages catalogue/images/availability
+basket, sign in with Google, save addresses/favourites, order for delivery with
+cash on delivery, track orders and reorder. The owner manages catalogue/images/availability
 and incoming orders. No customer web storefront or inventory quantity tracking.
 
 ## Repository
@@ -135,14 +135,13 @@ Google OAuth web client ID in `GOOGLE_WEB_CLIENT_ID` for the API and pass the sa
 ID to the Android build with `-PGOOGLE_WEB_CLIENT_ID=...`. Configure an Android
 OAuth client for `com.goodgrocer.app` and the signing certificate fingerprints.
 The Android app obtains an ID token through Credential Manager; the API verifies
-it and issues the app session. Enter a contact phone in the delivery address or
-at pickup checkout. Production requires the web client ID.
+it and issues the app session. Enter a contact phone in the delivery address.
+Production requires the web client ID.
 
-COD and UPI on delivery/collection work without payment credentials. The owner
-marks payment received independently of delivery status. Online UPI is clearly
-labelled as a development test; the order details screen can simulate PAID or
-FAILED, with no money transfer. An unpaid online order cannot be accepted.
-Production online UPI is disabled until a real integration is implemented.
+The first release accepts delivery orders paid in cash on delivery only. Pickup,
+UPI on delivery and online UPI remain in the code but are hidden from checkout
+and rejected for new orders. The owner records cash received independently of
+delivery status. Existing orders using older methods remain usable.
 
 ## Environment
 

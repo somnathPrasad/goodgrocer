@@ -7,14 +7,15 @@ from PIL import Image
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.models.domain import Customer, now
+from app.models.domain import Address, Customer, Order, OrderItem, PaymentAttempt, now
 from app.schemas.domain import ProductInput, VariantInput
 
 
 def cart(data, **changes):
     return {
         "items": [{"variant_id": data["variant"].id, "quantity": 2}],
-        "fulfilment_type": "PICKUP",
+        "fulfilment_type": "DELIVERY",
+        "address_id": data["address"].id,
         "payment_method": "COD",
         **changes,
     }
@@ -42,6 +43,46 @@ def owner(client, data):
     return {"Origin": "http://localhost:3000"}
 
 
+def legacy_order(db, data, fulfilment_type, payment_method):
+    order = Order(
+        order_number=f"GG-LEGACY-{fulfilment_type}-{payment_method}",
+        customer_id=data["customer"].id,
+        customer_phone="+919876543210",
+        idempotency_key=f"legacy-{fulfilment_type}-{payment_method}",
+        request_hash="0" * 64,
+        fulfilment_type=fulfilment_type,
+        payment_method=payment_method,
+        subtotal=Decimal("100.25"),
+        delivery_fee=Decimal("0.00"),
+        discount=Decimal("0.00"),
+        total=Decimal("100.25"),
+        address_snapshot=None,
+    )
+    order.items = [
+        OrderItem(
+            product_id=data["product"].id,
+            variant_id=data["variant"].id,
+            product_name="Rice",
+            variant_name="1 kg",
+            quantity=1,
+            unit_mrp=Decimal("120.00"),
+            unit_selling_price=Decimal("100.25"),
+            line_total=Decimal("100.25"),
+        )
+    ]
+    if payment_method == "ONLINE_UPI":
+        order.payment_attempts = [
+            PaymentAttempt(
+                provider="development",
+                reference="legacy-payment-reference",
+                amount=Decimal("100.25"),
+            )
+        ]
+    db.add(order)
+    db.commit()
+    return order
+
+
 def test_mobile_admin_session_and_browser_cookie_isolation(client, data):
     login = client.post(
         "/api/v1/admin/auth/mobile-login",
@@ -52,26 +93,36 @@ def test_mobile_admin_session_and_browser_cookie_isolation(client, data):
     headers = {"Authorization": f"Bearer {login.json()['token']}"}
     assert client.get("/api/v1/admin/me", headers=headers).status_code == 200
     assert client.get("/api/v1/orders", headers=headers).status_code == 401
-    assert client.post(
-        "/api/v1/admin/brands",
-        json={"name": "Mobile", "slug": "mobile"},
-        headers=headers,
-    ).status_code == 201
-    assert client.post(
-        "/api/v1/admin/auth/mobile-login",
-        json={"username": "owner", "password": "wrong"},
-    ).status_code == 401
-    assert client.post(
-        "/api/v1/admin/auth/mobile-login",
-        json={"username": "owner", "password": "a-secure-test-password"},
-        headers={"Origin": "https://evil.example"},
-    ).status_code == 403
+    assert (
+        client.post(
+            "/api/v1/admin/brands",
+            json={"name": "Mobile", "slug": "mobile"},
+            headers=headers,
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/v1/admin/auth/mobile-login",
+            json={"username": "owner", "password": "wrong"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/v1/admin/auth/mobile-login",
+            json={"username": "owner", "password": "a-secure-test-password"},
+            headers={"Origin": "https://evil.example"},
+        ).status_code
+        == 403
+    )
     assert client.post("/api/v1/admin/auth/logout", headers=headers).status_code == 204
     assert client.get("/api/v1/admin/me", headers=headers).status_code == 401
     cookie_headers = owner(client, data)
-    assert client.post(
-        "/api/v1/admin/brands", json={"name": "Blocked", "slug": "blocked"}
-    ).status_code == 403
+    assert (
+        client.post("/api/v1/admin/brands", json={"name": "Blocked", "slug": "blocked"}).status_code
+        == 403
+    )
     assert client.get("/api/v1/admin/me", headers=cookie_headers).status_code == 200
 
 
@@ -242,7 +293,7 @@ def test_status_transitions_and_terminal(client, data):
     assert client.post(path, json={"status": "DELIVERED"}, headers=headers).status_code == 409
     assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 200
     assert (
-        client.post(path, json={"status": "OUT_FOR_DELIVERY"}, headers=headers).status_code == 409
+        client.post(path, json={"status": "OUT_FOR_DELIVERY"}, headers=headers).status_code == 200
     )
     assert client.post(path, json={"status": "DELIVERED"}, headers=headers).status_code == 200
     assert (
@@ -307,7 +358,7 @@ def test_google_sign_in_uses_verified_subject_and_logout(client, db, monkeypatch
     assert client.get("/api/v1/orders", headers=headers).status_code == 401
 
 
-def test_google_customer_pickup_requires_contact_phone(client, db, monkeypatch, data):
+def test_google_customer_pickup_is_unavailable(client, db, data):
     google_customer = Customer(google_subject="google-account-456")
     db.add(google_customer)
     db.commit()
@@ -316,22 +367,25 @@ def test_google_customer_pickup_requires_contact_phone(client, db, monkeypatch, 
     headers = {
         "Authorization": "Bearer " + new_session(db, customer_id=google_customer.id)["token"]
     }
-    request = cart(data)
-    assert client.post("/api/v1/checkout/quote", json=request, headers=headers).status_code == 422
-    request["contact_phone"] = "9876543210"
+    request = cart(data, fulfilment_type="PICKUP", contact_phone="9876543210")
     quote = client.post("/api/v1/checkout/quote", json=request, headers=headers)
-    assert quote.status_code == 200, quote.text
+    assert quote.status_code == 422
+    assert quote.json()["error"]["code"] == "FULFILMENT_UNAVAILABLE"
+
+
+def test_pickup_order_cannot_use_an_existing_delivery_quote(client, data):
+    quote = client.post("/api/v1/checkout/quote", json=cart(data), headers=data["headers"]).json()
     order = client.post(
         "/api/v1/orders",
         json={
-            **request,
-            "quote_token": quote.json()["quote_token"],
-            "idempotency_key": "google-pickup-key-123",
+            **cart(data, fulfilment_type="PICKUP"),
+            "quote_token": quote["quote_token"],
+            "idempotency_key": "disabled-pickup-key-123",
         },
-        headers=headers,
+        headers=data["headers"],
     )
-    assert order.status_code == 201, order.text
-    assert order.json()["customer_phone"] == "+919876543210"
+    assert order.status_code == 422
+    assert order.json()["error"]["code"] == "FULFILMENT_UNAVAILABLE"
 
 
 def test_admin_csrf_auth_upload_and_product_edit(client, data):
@@ -382,34 +436,62 @@ def test_admin_csrf_auth_upload_and_product_edit(client, data):
     assert client.get("/api/v1/admin/me").status_code == 200
 
 
-def test_online_payment_boundary(client, data):
-    order = place(client, data, payment_method="ONLINE_UPI")
-    assert order["payment_status"] == "PENDING"
-    assert order["payment_attempts"][0]["provider"] == "development"
-    headers = owner(client, data)
-    path = f"/api/v1/admin/orders/{order['id']}/status"
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 409
-    assert (
-        client.post(
-            f"/api/v1/orders/{order['id']}/development-payment?outcome=PAID",
-            headers=data["other_headers"],
-        ).status_code
-        == 404
+@pytest.mark.parametrize("payment_method", ["UPI_ON_DELIVERY", "ONLINE_UPI"])
+def test_non_cash_payment_is_unavailable_for_new_orders(client, data, payment_method):
+    assert client.get("/api/v1/config").json()["online_upi_enabled"] is False
+    request = cart(data, payment_method=payment_method)
+    quote = client.post("/api/v1/checkout/quote", json=request, headers=data["headers"])
+    assert quote.status_code == 422
+    assert quote.json()["error"]["code"] == "PAYMENT_METHOD_UNAVAILABLE"
+
+    cod_quote = client.post(
+        "/api/v1/checkout/quote", json=cart(data), headers=data["headers"]
+    ).json()
+    order = client.post(
+        "/api/v1/orders",
+        json={
+            **request,
+            "quote_token": cod_quote["quote_token"],
+            "idempotency_key": "disabled-payment-key-123",
+        },
+        headers=data["headers"],
     )
+    assert order.status_code == 422
+    assert order.json()["error"]["code"] == "PAYMENT_METHOD_UNAVAILABLE"
+
+
+def test_existing_pickup_order_can_be_completed(client, db, data):
+    order = legacy_order(db, data, "PICKUP", "UPI_ON_DELIVERY")
+    customer_path = f"/api/v1/orders/{order.id}"
+    assert client.get(customer_path, headers=data["headers"]).json()["fulfilment_type"] == "PICKUP"
+    headers = owner(client, data)
+    owner_path = f"/api/v1/admin/orders/{order.id}"
     assert (
         client.post(
-            f"/api/v1/orders/{order['id']}/development-payment?outcome=PAID",
-            headers=data["headers"],
+            owner_path + "/status", json={"status": "ACCEPTED"}, headers=headers
         ).status_code
         == 200
     )
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 200
     assert (
         client.post(
-            path, json={"status": "CANCELLED", "reason": "test"}, headers=headers
+            owner_path + "/status", json={"status": "DELIVERED"}, headers=headers
         ).status_code
-        == 409
+        == 200
     )
+    assert (
+        client.post(owner_path + "/mark-paid", headers=headers).json()["payment_status"] == "PAID"
+    )
+
+
+def test_existing_online_order_can_complete_payment(client, db, data):
+    order = legacy_order(db, data, "DELIVERY", "ONLINE_UPI")
+    headers = owner(client, data)
+    path = f"/api/v1/admin/orders/{order.id}/status"
+    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 409
+    payment_path = f"/api/v1/orders/{order.id}/development-payment?outcome=PAID"
+    assert client.post(payment_path, headers=data["other_headers"]).status_code == 404
+    assert client.post(payment_path, headers=data["headers"]).status_code == 200
+    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 200
 
 
 def test_production_rejects_development_providers():
@@ -473,7 +555,6 @@ def test_delivery_full_lifecycle_and_payment_received(client, data):
         data,
         fulfilment_type="DELIVERY",
         address_id=address["id"],
-        payment_method="UPI_ON_DELIVERY",
     )
     headers = owner(client, data)
     path = f"/api/v1/admin/orders/{order['id']}"
@@ -488,16 +569,31 @@ def test_delivery_full_lifecycle_and_payment_received(client, data):
     )
 
 
-def test_quote_tampering_and_customer_binding(client, data):
+def test_quote_tampering_and_customer_binding(client, db, data):
     request = cart(data)
     quote = client.post("/api/v1/checkout/quote", json=request, headers=data["headers"]).json()
+    other_customer = db.query(Customer).filter_by(phone_number="+919876543211").one()
+    other_address = Address(
+        customer_id=other_customer.id,
+        recipient_name="Other customer",
+        phone="+919876543211",
+        line1="Other road",
+        city="Town",
+        state="Karnataka",
+    )
+    db.add(other_address)
+    db.commit()
     payload = {
         **request,
         "quote_token": quote["quote_token"],
         "idempotency_key": "test-bound-quote-1234",
     }
     assert (
-        client.post("/api/v1/orders", json=payload, headers=data["other_headers"]).status_code
+        client.post(
+            "/api/v1/orders",
+            json={**payload, "address_id": other_address.id},
+            headers=data["other_headers"],
+        ).status_code
         == 409
     )
     payload["quote_token"] = "tampered." + quote["quote_token"]

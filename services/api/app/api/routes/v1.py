@@ -51,7 +51,7 @@ owner = APIRouter(prefix="/admin", dependencies=[Depends(admin)], tags=["admin"]
 def config():
     settings = get_settings()
     return {
-        "online_upi_enabled": settings.payment_provider != "disabled",
+        "online_upi_enabled": False,
         "development": settings.environment != "production",
         "delivery_fee": str(settings.delivery_fee),
     }

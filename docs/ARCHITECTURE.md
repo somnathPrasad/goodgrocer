@@ -39,6 +39,8 @@ uses a unique idempotency key. Orders snapshot prices, names and addresses.
 Order transitions lock the order and enforce the exact product vocabulary;
 payment state is independent. Pickup supports direct ACCEPTED → DELIVERED.
 Paid online cancellation awaits a refund integration.
+The first release rejects new pickup and non-COD checkout requests in the API;
+existing orders retain their recorded workflows.
 
 ## Clients
 

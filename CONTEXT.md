@@ -1,7 +1,7 @@
-# Goodgrocer customer browsing
+# Goodgrocer customer experience
 
-This context defines the customer-facing browsing language and the expected
-continuity of catalogue content while a customer moves through the store.
+This context defines customer-facing browsing and ordering language, including
+catalogue continuity and first-release checkout choices.
 
 ## Language
 
@@ -46,6 +46,14 @@ A browsing context is refreshed when active unless its last successful refresh
 was within roughly one minute; an explicit customer refresh bypasses the window.
 _Avoid_: refreshing on every tab selection
 
+**Cash on delivery (COD)**:
+The first-release payment method for a delivery order, collected by the store when the order arrives.
+_Avoid_: cash at collection, UPI on delivery
+
+**Store pickup**:
+A later-release fulfilment option in which the customer collects an order from the store.
+_Avoid_: first-release checkout option
+
 ## Relationships
 
 - **Browsing continuity** applies to catalogue browsing and refreshes; it does
@@ -60,6 +68,9 @@ _Avoid_: refreshing on every tab selection
   already been loaded in the current session.
 - A **Refresh window** limits background traffic without preventing explicit
   refresh.
+- **Cash on delivery (COD)** applies to first-release delivery orders; **Store pickup** is unavailable in that release.
+- Checkout shows the first-release **Cash on delivery (COD)** method and delivery fulfilment only.
+- Existing orders keep their recorded fulfilment and payment method; reordering their items follows the current checkout choices.
 
 ## Example dialogue
 
@@ -92,9 +103,14 @@ _Avoid_: refreshing on every tab selection
 > **Dev:** "Should switching tabs repeatedly call the API each time?"
 > **Domain expert:** "No. Refresh active content after a short window, but let
 > an explicit refresh happen immediately."
+>
+> **Dev:** "Can the customer collect an order and pay cash at the store in the first release?"
+> **Domain expert:** "No. The first release accepts delivery orders paid in cash on delivery."
 
 ## Flagged ambiguities
 
 - "Loading screen" can mean either the first-load placeholder for a screen or
   a progress indication during refresh. The product decision is to use a
   placeholder only when that screen has no loaded content.
+- "COD" previously also labeled cash at pickup. For the first release it means
+  cash collected on delivery; pickup is unavailable for new orders.

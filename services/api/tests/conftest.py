@@ -15,7 +15,7 @@ from app.api.dependencies import get_db
 from app.core.config import get_settings
 from app.db.base import Base
 from app.main import app
-from app.models.domain import Admin, Brand, Category, Customer, Product, ProductVariant
+from app.models.domain import Address, Admin, Brand, Category, Customer, Product, ProductVariant
 from app.services.auth import new_session, password_hasher
 
 
@@ -52,6 +52,16 @@ def data(db):
     admin = Admin(username="owner", password_hash=password_hasher.hash("a-secure-test-password"))
     db.add_all([brand, *categories, customer, other, admin])
     db.flush()
+    address = Address(
+        customer_id=customer.id,
+        recipient_name="Customer",
+        phone="+919876543210",
+        line1="Market road",
+        city="Town",
+        state="Karnataka",
+    )
+    db.add(address)
+    db.flush()
     product = Product(name="Rice", slug="rice", brand_id=brand.id, categories=categories)
     db.add(product)
     db.flush()
@@ -67,6 +77,7 @@ def data(db):
         "product": product,
         "variant": variant,
         "customer": customer,
+        "address": address,
         "categories": categories,
         "headers": {"Authorization": f"Bearer {token}"},
         "other_headers": {"Authorization": f"Bearer {other_token}"},

@@ -24,8 +24,9 @@ an unverified customer callback. Permit cancellation of paid orders only after
 implementing and testing refund behavior. Provider calls should not hold database
 locks during slow network operations; persist an attempt before handoff.
 
-`PAYMENT_PROVIDER=disabled` makes online UPI unavailable while COD and UPI on
-delivery work. The development outcome endpoint is authenticated, owner-scoped,
+The first release accepts delivery and COD only, regardless of payment provider
+configuration. `PAYMENT_PROVIDER=disabled` also keeps online UPI unavailable when
+that release restriction is eventually lifted. The development outcome endpoint is authenticated, owner-scoped,
 terminal-state checked and guarded by the provider factory. It cannot run in
 production. A failed test payment leaves a visible FAILED order, which the owner
 can cancel; the customer may reorder. No money is transferred.
@@ -57,9 +58,9 @@ can cancel; the customer may reorder. No money is transferred.
   Request logs contain method/path/status/duration/request ID, not auth bodies.
 - Configure the Android HTTPS API URL, release signing and store distribution.
   Test on physical devices, TalkBack, larger text and unreliable networks.
-- Confirm store-specific pickup directions, contact information and delivery fee.
+- Confirm store contact information and delivery fee.
   Fees default to zero. Addresses are manually assessed, without serviceability
-  APIs. The owner must record received COD/UPI payments explicitly.
+  APIs. The owner must record received cash payments explicitly.
 
 Infrastructure provisioning, release signing, a full penetration test, production
 load testing and real payment certification are not delivered by a local V1.

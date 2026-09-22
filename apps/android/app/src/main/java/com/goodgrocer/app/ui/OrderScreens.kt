@@ -50,20 +50,27 @@ fun CheckoutScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            SectionTitle("How would you like your order?")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(
-                    "DELIVERY" to "Delivery",
-                    "PICKUP" to "Store pickup"
-                ).forEach { (value, label) ->
-                    FilterChip(
-                        selected =
-                        state.fulfilment == value,
-                        onClick = {
-                            vm.checkoutOptions(fulfilment = value)
-                        },
-                        label = { Text(label) }
-                    )
+            // Keep the other option defined for a later release.
+            val fulfilmentOptions = listOf(
+                "DELIVERY" to "Delivery",
+                "PICKUP" to "Store pickup"
+            ).filter { (value, _) -> value == "DELIVERY" }
+            SectionTitle(
+                if (fulfilmentOptions.size == 1) {
+                    "Delivery order"
+                } else {
+                    "How would you like your order?"
+                }
+            )
+            if (fulfilmentOptions.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    fulfilmentOptions.forEach { (value, label) ->
+                        FilterChip(
+                            selected = state.fulfilment == value,
+                            onClick = { vm.checkoutOptions(fulfilment = value) },
+                            label = { Text(label) }
+                        )
+                    }
                 }
             }
         }
@@ -123,39 +130,45 @@ fun CheckoutScreen(
         }
         item {
             SectionTitle("Payment")
-            listOf(
-                "COD" to "Cash on delivery / collection",
+            // Keep the other methods defined for a later release.
+            val paymentOptions = listOf(
+                "COD" to "Cash on delivery",
                 "UPI_ON_DELIVERY" to "UPI on delivery / collection",
                 "ONLINE_UPI" to "Online UPI"
-            ).forEach { (value, label) ->
-                val enabled = value != "ONLINE_UPI" || state.config?.online_upi_enabled == true
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected =
-                        state.payment == value,
-                        onClick = {
-                            vm.checkoutOptions(payment = value)
-                        },
-                        enabled = enabled
-                    )
-                    Column {
-                        Text(label)
-                        if (!enabled) {
-                            Text(
-                                "Not available yet",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (value ==
-                            "ONLINE_UPI" &&
-                            enabled &&
-                            state.config?.development == true
-                        ) {
-                            Text(
-                                "Development test payment",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Forest
-                            )
+            ).filter { (value, _) -> value == "COD" }
+            if (paymentOptions.size == 1) {
+                Text(paymentOptions.single().second)
+            } else {
+                paymentOptions.forEach { (value, label) ->
+                    val enabled = value == "COD"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected =
+                            state.payment == value,
+                            onClick = {
+                                vm.checkoutOptions(payment = value)
+                            },
+                            enabled = enabled
+                        )
+                        Column {
+                            Text(label)
+                            if (!enabled) {
+                                Text(
+                                    "Not available yet",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (value ==
+                                "ONLINE_UPI" &&
+                                enabled &&
+                                state.config?.development == true
+                            ) {
+                                Text(
+                                    "Development test payment",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Forest
+                                )
+                            }
                         }
                     }
                 }
