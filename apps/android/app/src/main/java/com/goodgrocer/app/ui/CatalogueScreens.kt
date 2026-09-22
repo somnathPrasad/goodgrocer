@@ -440,19 +440,19 @@ fun CartScreen(vm: ShopViewModel, cart: List<CartLine>, checkout: () -> Unit, sh
             ) {
                 Row(
                     Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ProductImage(line.product.image_url, Modifier.size(68.dp))
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(line.product.name, fontWeight = FontWeight.Bold)
                         Text(line.variant.name, style = MaterialTheme.typography.bodySmall)
                         Price(line.variant)
                         Quantity(line.quantity, { vm.quantity(line.product, line.variant, it) })
+                        TextButton(onClick = {
+                            vm.quantity(line.product, line.variant, 0)
+                        }) { Text("Remove") }
                     }
-                    TextButton(onClick = {
-                        vm.quantity(line.product, line.variant, 0)
-                    }) { Text("Remove") }
                 }
             }
         }

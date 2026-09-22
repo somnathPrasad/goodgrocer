@@ -111,8 +111,8 @@ fun ShopApp(vm: ShopViewModel) {
     }, bottomBar = {
         Column {
             if (cart.isNotEmpty() &&
-                route !in listOf("cart", "checkout") &&
-                route != "entry"
+                (route in listOf("home", "search", "favourites") ||
+                    route.startsWith("category/") || route.startsWith("product/"))
             ) {
                 val basketSummary = remember(cart) {
                     val count = cart.sumOf { it.quantity }
@@ -293,7 +293,6 @@ fun ShopApp(vm: ShopViewModel) {
                     login = { authenticated("account") },
                     onAddresses = { authenticated("addresses") },
                     onOrders = { authenticated("orders") },
-                    onFavourites = { authenticated("favourites") },
                     logout = { vm.logout() }
                 )
             }

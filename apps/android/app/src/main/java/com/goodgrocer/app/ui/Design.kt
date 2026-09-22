@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.outlined.ShoppingBasket
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -143,12 +144,14 @@ fun ProductImage(path: String?, modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painter,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (path != null && state !is AsyncImagePainter.State.Error) {
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         when (state) {
             is AsyncImagePainter.State.Loading -> {
                 CircularProgressIndicator(
@@ -156,12 +159,12 @@ fun ProductImage(path: String?, modifier: Modifier = Modifier) {
                     strokeWidth = 2.dp
                 )
             }
-            is AsyncImagePainter.State.Error -> {
+            is AsyncImagePainter.State.Error, is AsyncImagePainter.State.Empty -> {
                 Icon(
-                    imageVector = Icons.Outlined.ShoppingBasket,
+                    imageVector = Icons.Outlined.ImageNotSupported,
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = Forest.copy(alpha = .4f)
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .35f)
                 )
             }
             else -> {}
@@ -244,7 +247,10 @@ fun Quantity(value: Int, change: (Int) -> Unit, enabled: Boolean = true) {
 
 @Composable
 fun ProductCard(product: Product, quantity: Int, open: () -> Unit, add: (Variant, Int) -> Unit) {
-    val variant = product.variants.firstOrNull { it.available } ?: product.variants.firstOrNull()
+    val options = product.variants.filter { it.active && it.available }
+        .ifEmpty { product.variants.filter { it.active } }
+    val variant = options.minByOrNull { it.selling_price.toBigDecimalOrNull() ?: BigDecimal.ZERO }
+    val hasMultipleSizes = product.variants.count { it.active } > 1
     Card(
         onClick = open,
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -268,20 +274,22 @@ fun ProductCard(product: Product, quantity: Int, open: () -> Unit, add: (Variant
                 maxLines = 2
             )
             Text(
-                variant?.name ?: "No variants",
+                if (hasMultipleSizes) "Choose a size" else variant?.name ?: "No variants",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (variant !=
                 null
             ) {
-                Price(variant)
+                if (hasMultipleSizes) {
+                    Text("From ${rupees(variant.selling_price)}", fontWeight = FontWeight.Bold)
+                } else {
+                    Price(variant)
+                }
                 if (product.available &&
                     variant.available
                 ) {
-                    if (product.variants.size >
-                        1
-                    ) {
+                    if (hasMultipleSizes) {
                         OutlinedButton(onClick = open, shape = RoundedCornerShape(10.dp)) {
                             Text("Choose size")
                         }

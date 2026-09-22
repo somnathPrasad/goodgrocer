@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
@@ -33,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,7 +60,6 @@ fun AccountScreen(
     login: () -> Unit,
     onAddresses: () -> Unit,
     onOrders: () -> Unit,
-    onFavourites: () -> Unit,
     logout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -72,7 +71,7 @@ fun AccountScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SectionTitle("Your Account", "Manage your profile, orders, and preferences.")
+        SectionTitle("Your Account", "Manage delivery addresses and orders.")
 
         if (!signedIn) {
             Card(
@@ -114,74 +113,7 @@ fun AccountScreen(
                     PrimaryButton("Sign in with Google", click = login)
                 }
             }
-        } else {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("GG", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Goodgrocer Member", style = MaterialTheme.typography.titleLarge)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(" Verified ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                }
-                                Text("Active shopper", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        AccountQuickCard(
-                            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                            title = "Orders",
-                            subtitle = "History",
-                            modifier = Modifier.weight(1f),
-                            onClick = onOrders
-                        )
-                        AccountQuickCard(
-                            icon = Icons.Outlined.FavoriteBorder,
-                            title = "Saved",
-                            subtitle = "Wishlist",
-                            modifier = Modifier.weight(1f),
-                            onClick = onFavourites
-                        )
-                        AccountQuickCard(
-                            icon = Icons.Outlined.LocationOn,
-                            title = "Addresses",
-                            subtitle = "Locations",
-                            modifier = Modifier.weight(1f),
-                            onClick = onAddresses
-                        )
-                    }
-                }
-            }
         }
-
-        Text("Shopping & Account", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         if (signedIn) {
             AccountMenuItem(
@@ -195,12 +127,6 @@ fun AccountScreen(
                 title = "Delivery Addresses",
                 subtitle = "Manage saved home and work locations",
                 onClick = onAddresses
-            )
-            AccountMenuItem(
-                icon = Icons.Outlined.FavoriteBorder,
-                title = "Saved Favourites",
-                subtitle = "View and reorder your favorite items",
-                onClick = onFavourites
             )
         } else {
             AccountMenuItem(
@@ -252,37 +178,6 @@ fun AccountScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun AccountQuickCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(14.dp),
-        modifier = modifier
-    ) {
-        Column(
-            Modifier.padding(12.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 
@@ -435,6 +330,10 @@ fun AddressEditor(
     }
     var moreDetails by rememberSaveable(initial.id) { mutableStateOf(false) }
     var lookupMessage by remember { mutableStateOf<String?>(null) }
+    val normalizedPhone = phone.replace(Regex("[\\s()-]"), "")
+    val phoneValid = normalizedPhone.matches(Regex("[6-9]\\d{9}")) ||
+        normalizedPhone.matches(Regex("\\+[1-9]\\d{7,14}"))
+    val missingRequired = listOf(name, line1, city, region).any { it.isBlank() }
     if (showMap) {
         MapPinPicker(
             initial = LatLng(
@@ -476,11 +375,24 @@ fun AddressEditor(
             if (latitude != null) Text("Delivery pin selected")
         }
         lookupMessage?.let { Text(it) }
-        ShopField("Recipient name", name, { name = it })
-        ShopField("Phone", phone, {
-            phone = it
-        }, keyboard = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        ShopField("House / flat number and street", line1, {
+        Text("* Required fields", style = MaterialTheme.typography.bodySmall)
+        ShopField("Recipient name *", name, { name = it })
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = { Text("Phone *") },
+            isError = phone.isNotBlank() && !phoneValid,
+            supportingText = {
+                if (phone.isNotBlank() && !phoneValid) {
+                    Text("Enter a 10-digit Indian mobile number or an international number with +.")
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        ShopField("House / flat number and street *", line1, {
             line1 =
                 it
         })
@@ -489,11 +401,11 @@ fun AddressEditor(
                 it
         })
         if (locality.isNotBlank()) Text("Area: $locality")
-        ShopField("City / town", city, {
+        ShopField("City / town *", city, {
             city =
                 it
         })
-        ShopField("State", region, { region = it })
+        ShopField("State *", region, { region = it })
         TextButton(onClick = { moreDetails = !moreDetails }) {
             Text(if (moreDetails) "Fewer details" else "More address details")
         }
@@ -504,10 +416,7 @@ fun AddressEditor(
         }
         PrimaryButton(
             "Save address",
-            !busy &&
-                listOf(name, phone, line1, city, region).all {
-                    it.isNotBlank()
-                }
+            !busy && !missingRequired && phoneValid
         ) {
             save(
                 initial.copy(
@@ -524,6 +433,17 @@ fun AddressEditor(
                     city = city, state = region, postal_code = postal.ifBlank { null },
                     latitude = latitude, longitude = longitude
                 )
+            )
+        }
+        if (!busy && (missingRequired || !phoneValid)) {
+            Text(
+                when {
+                    missingRequired -> "Fill in the required fields to save this address."
+                    phone.isBlank() -> "Enter a phone number to save this address."
+                    else -> "Enter a valid phone number to save this address."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         TextButton(onClick = cancel) { Text("Cancel") }

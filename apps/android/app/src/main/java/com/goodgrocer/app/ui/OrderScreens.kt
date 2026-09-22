@@ -37,6 +37,27 @@ import com.goodgrocer.app.data.Address
 import com.goodgrocer.app.data.CartLine
 import kotlinx.coroutines.delay
 
+private fun fulfilmentLabel(value: String) = when (value) {
+    "DELIVERY" -> "Home delivery"
+    "PICKUP" -> "Store pickup"
+    else -> value.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+}
+
+private fun paymentMethodLabel(value: String) = when (value) {
+    "COD" -> "Cash on delivery"
+    "UPI_ON_DELIVERY" -> "UPI on delivery"
+    "ONLINE_UPI" -> "Online UPI"
+    else -> value.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+}
+
+private fun paymentStatusLabel(status: String, method: String) = when (status) {
+    "PAID" -> "Payment received"
+    "PENDING" -> if (method == "COD") "Pay cash on delivery" else "Payment pending"
+    "FAILED" -> "Payment failed"
+    "REFUNDED" -> "Payment refunded"
+    else -> "Payment: ${status.replace('_', ' ').lowercase()}"
+}
+
 @Composable
 fun CheckoutScreen(
     vm: ShopViewModel,
@@ -313,7 +334,7 @@ fun OrdersScreen(vm: ShopViewModel, open: (Int) -> Unit) {
                         maxLines = 2
                     )
                     Text(
-                        order.created_at.take(10) + " · " + order.fulfilment_type,
+                        order.created_at.take(10) + " · " + fulfilmentLabel(order.fulfilment_type),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -365,10 +386,10 @@ fun OrderScreen(id: Int, success: Boolean, vm: ShopViewModel, reordered: () -> U
             }
             SectionTitle(order.order_number, order.created_at.take(10))
             Text(
-                order.fulfilment_type.replace('_', ' ') + " · " +
-                    order.payment_method.replace('_', ' ')
+                fulfilmentLabel(order.fulfilment_type) + " · " +
+                    paymentMethodLabel(order.payment_method)
             )
-            Text("Payment: ${order.payment_status}")
+            Text(paymentStatusLabel(order.payment_status, order.payment_method))
         }
         item {
             if (order.status ==
