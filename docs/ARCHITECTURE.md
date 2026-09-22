@@ -7,7 +7,8 @@ only through the backend; FastAPI alone owns PostgreSQL access.
 
 - Android: Kotlin, Jetpack Compose/Material 3, ViewModel, StateFlow/coroutines,
   Retrofit/OkHttp, Moshi and Coil. Navigation Compose organizes the screens.
-- Admin: Next.js App Router, TypeScript/React, semantic controls and custom CSS.
+- Admin Android: Kotlin, Jetpack Compose/Material 3, ViewModel, Retrofit/Moshi.
+- Retained admin web: Next.js App Router, TypeScript/React, semantic controls and custom CSS.
 - Backend: Python 3.12/uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2,
   psycopg 3, PostgreSQL 17 and explicit Alembic migrations.
 - Local infrastructure: Docker Compose for PostgreSQL only.
@@ -45,14 +46,20 @@ The Next.js server proxies `/api/v1/admin` to FastAPI; an HttpOnly SameSite=Stri
 cookie stays in the browser, and FastAPI checks Origin for writes. No browser
 cross-origin access is required. The portal polls orders every 30 seconds.
 
+The admin Android app calls FastAPI directly. Its dedicated password login returns
+an opaque 12-hour admin session token, which it sends as a bearer token. The
+token is AES-GCM encrypted with an Android Keystore key in private preferences;
+backups are disabled. The browser login continues to use its cookie and Origin
+check. The admin Android app polls dashboard and orders every 30 seconds.
+
 Android uses UI → ViewModel → Repository → API/local storage. The basket persists
 in private preferences and remains usable without login. Session material is
 AES-GCM encrypted using Android Keystore; backups are disabled. Checkout keys
 persist for retry safety. Money uses BigDecimal. Order details refresh every
 15 seconds while visible. Images use Coil caching and fixed-size placeholders.
 
-OpenAPI is exported to `packages/api-contracts`; the admin consumes generated
-TypeScript types. Android uses explicit Moshi DTOs, verified by tests/builds.
+OpenAPI is exported to `packages/api-contracts`; admin web consumes generated
+TypeScript types. Both Android apps use explicit Moshi DTOs, verified by builds.
 
 ## External services
 
@@ -67,5 +74,5 @@ selected; see `PRODUCTION.md`.
 ## Future considerations
 
 Native Swift/SwiftUI iOS and multi-store remain future work. There are no tenant
-columns, organizations or merchant onboarding. PostgreSQL, a single API and the
-two clients are sufficient for the expected 500-product catalogue.
+columns, organizations or merchant onboarding. PostgreSQL and a single API
+serve the customer app and both owner apps for the expected 500-product catalogue.

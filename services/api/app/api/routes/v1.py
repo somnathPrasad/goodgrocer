@@ -276,6 +276,14 @@ def admin_login(
     return {"message": "Signed in"}
 
 
+@router.post("/admin/auth/mobile-login", response_model=TokenResponse, tags=["admin-auth"])
+def admin_mobile_login(data: LoginInput, request: Request, db: Session = Depends(get_db)):
+    # Native clients have no Origin. Reject browser-originated requests here.
+    if request.headers.get("origin"):
+        raise DomainError("FORBIDDEN", "Use the browser sign-in endpoint", 403)
+    return auth.admin_login(db, data.username, data.password, request.client.host)
+
+
 @owner.post("/auth/logout", status_code=204)
 def admin_logout(request: Request, response: Response, db: Session = Depends(get_db)):
     db.delete(session_for(request, db, True))

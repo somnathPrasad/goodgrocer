@@ -203,3 +203,27 @@ app signing certificate fingerprints. Existing phone-only customer records and
 orders remain stored but are not automatically linked to a Google account. A
 verified migration path must be decided before migrating existing production
 users. The old OTP table is retained for legacy data but has no active endpoint.
+
+## ADR-008: Add a native Android owner app while retaining the web portal
+
+- Date: 2026-09-22
+- Status: Accepted
+
+### Context
+
+The owner needs a separate Android application with the management capabilities
+of the existing web portal. The web portal must remain available.
+
+### Decision
+
+Add `apps/admin-android` as an independent Kotlin/Compose application with its
+own application ID. It uses the existing admin API for dashboard, catalogue,
+images and orders. A dedicated mobile password login issues the existing opaque
+admin session as a bearer token. Store it encrypted with Android Keystore and
+disable backups. Keep browser cookie login and its Origin checks unchanged.
+
+### Consequences
+
+The backend supports two admin session transports, each restricted to admin
+sessions. The web portal remains functional. Android release builds need an
+HTTPS API URL and signing configuration; app distribution is operator-managed.

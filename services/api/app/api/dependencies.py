@@ -19,8 +19,10 @@ def get_db():
 
 def session_for(request: Request, db: Session, admin: bool):
     if admin:
-        token = request.cookies.get("gg_admin", "")
-        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        authorization = request.headers.get("authorization", "")
+        bearer = authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
+        token = bearer or request.cookies.get("gg_admin", "")
+        if not bearer and request.method not in {"GET", "HEAD", "OPTIONS"}:
             if request.headers.get("origin") != get_settings().admin_origin:
                 raise DomainError("FORBIDDEN", "Untrusted request origin", 403)
     else:

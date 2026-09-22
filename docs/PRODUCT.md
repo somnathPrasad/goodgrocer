@@ -3,7 +3,7 @@
 ## V1 scope
 
 One physical Kirana store, approximately 500 products, a native Android customer
-app and a store-owner web portal share one backend. Browsing, search and a
+app, a native Android owner app and the retained store-owner web portal share one backend. Browsing, search and a
 persistent local cart require no login. Google sign-in authenticates checkout, saved
 addresses, account favourites and orders. A contact phone is collected from the
 delivery address or at pickup checkout; it is not an account identifier. Customers can choose delivery or pickup,
@@ -44,9 +44,10 @@ Delivery serviceability is decided manually by the owner, who may cancel an
 unserviceable order. No maps, geofences, routing or automatic address validation.
 Delivery fee is configurable (default zero), with no minimum order or discounts.
 
-## Owner portal
+## Owner apps
 
 One admin account type; secure bootstrap, password login and expiring sessions.
+The native Android owner app is the primary owner interface; the web portal remains available.
 Dashboard, brands, categories (ordering/images), product search/filter/edit,
 multi-category assignment, variant pricing/order/availability and order workflow.
 Images are uploaded with type/size validation; database holds references only.

@@ -1,7 +1,7 @@
 # Goodgrocer
 
-A single-store grocery ordering app: native Android shopping, a Next.js owner
-portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
+A single-store grocery ordering app: native Android shopping and owner apps,
+a retained Next.js owner portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
 basket, sign in with Google, save addresses/favourites, order for delivery or
 pickup, track orders and reorder. The owner manages catalogue/images/availability
 and incoming orders. No customer web storefront or inventory quantity tracking.
@@ -10,6 +10,7 @@ and incoming orders. No customer web storefront or inventory quantity tracking.
 
 ```text
 apps/android/             Kotlin, Compose, Material 3, ViewModel, Retrofit/Moshi
+apps/admin-android/       Native Android store-owner app
 apps/admin-web/           Next.js, React, TypeScript, custom CSS
 services/api/
   app/api/               Versioned customer/admin routes and authorization
@@ -114,6 +115,19 @@ builds. Release builds require an HTTPS endpoint and your own signing setup:
   -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
 ```
 
+### Admin Android
+
+Open `apps/admin-android` as a separate Android Studio project and run `app`.
+It uses the same bootstrapped admin username and password as the web portal.
+The default emulator API URL is `http://10.0.2.2:8000/`. For a device or
+release build supply `-PAPI_URL=https://your-api.example/` with a trailing slash.
+Debug builds allow local HTTP; release builds require HTTPS and signing setup.
+The web portal remains available in `apps/admin-web`.
+
+```sh
+./apps/admin-android/gradlew -p apps/admin-android :app:assembleDebug
+```
+
 ### Google sign-in and development payments
 
 Browse and fill the basket without signing in. For customer accounts, configure a
@@ -212,7 +226,7 @@ After changing Pydantic contracts, regenerate and commit both artifacts:
 ./scripts/generate-contracts.sh
 ```
 
-OpenAPI is the source of truth; admin types are generated with
+OpenAPI is the source of truth; admin web types are generated with
 `openapi-typescript`. Android keeps small explicit Moshi DTOs in `data/Models.kt`
 and endpoint declarations in `data/Api.kt`; update them alongside contract
 changes and run the Android tests/build. No internal publishing system is needed.

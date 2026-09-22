@@ -842,6 +842,47 @@
         }
       }
     },
+    "/api/v1/admin/auth/mobile-login": {
+      "post": {
+        "tags": [
+          "admin-auth"
+        ],
+        "summary": "Admin Mobile Login",
+        "operationId": "admin_mobile_login_api_v1_admin_auth_mobile_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/auth/logout": {
       "post": {
         "tags": [

@@ -42,6 +42,39 @@ def owner(client, data):
     return {"Origin": "http://localhost:3000"}
 
 
+def test_mobile_admin_session_and_browser_cookie_isolation(client, data):
+    login = client.post(
+        "/api/v1/admin/auth/mobile-login",
+        json={"username": "owner", "password": "a-secure-test-password"},
+    )
+    assert login.status_code == 200, login.text
+    assert "gg_admin" not in login.headers.get("set-cookie", "")
+    headers = {"Authorization": f"Bearer {login.json()['token']}"}
+    assert client.get("/api/v1/admin/me", headers=headers).status_code == 200
+    assert client.get("/api/v1/orders", headers=headers).status_code == 401
+    assert client.post(
+        "/api/v1/admin/brands",
+        json={"name": "Mobile", "slug": "mobile"},
+        headers=headers,
+    ).status_code == 201
+    assert client.post(
+        "/api/v1/admin/auth/mobile-login",
+        json={"username": "owner", "password": "wrong"},
+    ).status_code == 401
+    assert client.post(
+        "/api/v1/admin/auth/mobile-login",
+        json={"username": "owner", "password": "a-secure-test-password"},
+        headers={"Origin": "https://evil.example"},
+    ).status_code == 403
+    assert client.post("/api/v1/admin/auth/logout", headers=headers).status_code == 204
+    assert client.get("/api/v1/admin/me", headers=headers).status_code == 401
+    cookie_headers = owner(client, data)
+    assert client.post(
+        "/api/v1/admin/brands", json={"name": "Blocked", "slug": "blocked"}
+    ).status_code == 403
+    assert client.get("/api/v1/admin/me", headers=cookie_headers).status_code == 200
+
+
 @pytest.mark.parametrize(
     "image_url",
     [None, "", "/media/apple.jpg", "https://example.com/apple.jpg"],
