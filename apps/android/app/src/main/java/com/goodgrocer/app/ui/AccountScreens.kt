@@ -20,15 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.HelpCenter
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -219,27 +216,6 @@ fun AccountScreen(
                 onClick = login
             )
         }
-
-        Text("Support & About", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-        AccountMenuItem(
-            icon = Icons.AutoMirrored.Outlined.HelpCenter,
-            title = "Help & Support",
-            subtitle = "FAQs, store hours, and customer care",
-            onClick = {}
-        )
-        AccountMenuItem(
-            icon = Icons.Outlined.Storefront,
-            title = "Store Information",
-            subtitle = "Goodgrocer neighborhood store details",
-            onClick = {}
-        )
-        AccountMenuItem(
-            icon = Icons.Outlined.Info,
-            title = "About Goodgrocer",
-            subtitle = "Version ${BuildConfig.VERSION_NAME}",
-            onClick = {}
-        )
 
         if (signedIn) {
             Spacer(Modifier.height(8.dp))

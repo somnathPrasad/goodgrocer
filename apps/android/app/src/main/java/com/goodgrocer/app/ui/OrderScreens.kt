@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.goodgrocer.app.data.Address
 import com.goodgrocer.app.data.CartLine
 import kotlinx.coroutines.delay
 
@@ -95,11 +96,7 @@ fun CheckoutScreen(
                             }
                         )
                         Column {
-                            Text(address.recipient_name, fontWeight = FontWeight.Bold)
-                            Text(
-                                "${address.line1}, ${address.city}",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            DeliveryAddressDetails(address)
                         }
                     }
                 }
@@ -177,6 +174,14 @@ fun CheckoutScreen(
         item {
             val quote = state.quote
             if (quote != null) {
+                state.addresses.firstOrNull { it.id == state.addressId }?.let { address ->
+                    SectionTitle(
+                        "Deliver to",
+                        "Your store will confirm whether it can serve this address."
+                    )
+                    DeliveryAddressDetails(address)
+                    Spacer(Modifier.height(16.dp))
+                }
                 SectionTitle("Your confirmed total")
                 quote.items.forEach { item ->
                     Row(
@@ -226,6 +231,22 @@ fun CheckoutScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeliveryAddressDetails(address: Address) {
+    Text(address.recipient_name, fontWeight = FontWeight.Bold)
+    Text(address.phone, style = MaterialTheme.typography.bodyMedium)
+    listOfNotNull(
+        address.line1,
+        address.line2?.takeIf { it.isNotBlank() },
+        address.locality?.takeIf { it.isNotBlank() },
+        address.landmark?.takeIf { it.isNotBlank() }?.let { "Landmark: $it" },
+        listOf(address.city, address.state, address.postal_code.orEmpty())
+            .filter { it.isNotBlank() }.joinToString(", ")
+    ).forEach { line ->
+        Text(line, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

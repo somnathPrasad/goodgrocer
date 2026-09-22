@@ -71,7 +71,10 @@ fun CatalogueScreen(
     category: (Int) -> Unit = {}
 ) {
     val state = collectShopState(vm)
-    var query by rememberSaveable { mutableStateOf(state.query) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val visibleQuery = if (home || categoryId != null) "" else query
+    val catalogueMatches = state.query == visibleQuery && state.category == categoryId
+    val products = if (catalogueMatches) state.products else emptyList()
     val gridState = rememberLazyGridState()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -82,10 +85,8 @@ fun CatalogueScreen(
             keyboardController?.show()
         }
     }
-    LaunchedEffect(home, categoryId) {
-        if (home || categoryId != null) {
-            vm.browse(category = categoryId)
-        }
+    LaunchedEffect(home, categoryId, autoFocusSearch) {
+        vm.browse(query = visibleQuery, category = categoryId)
     }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(155.dp),
@@ -185,39 +186,76 @@ fun CatalogueScreen(
                         leadingIcon = {
                             Icon(Icons.Outlined.Search, null)
                         },
+                        trailingIcon = if (query.isNotEmpty()) {
+                            {
+                                TextButton(onClick = {
+                                    query = ""
+                                    vm.browse()
+                                }) { Text("Clear") }
+                            }
+                        } else {
+                            null
+                        },
                         singleLine = true,
                         shape = MaterialTheme.shapes.medium
                     )
+                    if (query.isBlank()) {
+                        SectionTitle("Browse all products", "Search above to find an item by name.")
+                    } else {
+                        SectionTitle("Results for “$query”")
+                    }
                 }
             }
         }
-        if (state.catalogueLoading && state.products.isNotEmpty()) {
+        if (catalogueMatches && state.catalogueLoading && products.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
         }
-        if (state.catalogueLoading &&
-            state.products.isEmpty()
+        if (!catalogueMatches || state.catalogueLoading && products.isEmpty()
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) { LoadingState() }
         }
-        if (!state.catalogueLoading &&
-            state.products.isEmpty()
+        if (catalogueMatches && !state.catalogueLoading && state.catalogueError != null) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                EmptyState(
+                    "Couldn’t load products",
+                    state.catalogueError,
+                    "Retry",
+                    { vm.browse(visibleQuery, categoryId, force = true) }
+                )
+            }
+        } else if (catalogueMatches && !state.catalogueLoading && products.isEmpty()
         ) {
             item(span = {
                 GridItemSpan(maxLineSpan)
             }) {
-                EmptyState(
-                    "Nothing here yet",
-                    "Try another search, or refresh to reconnect.",
-                    "Refresh",
-                    {
-                        vm.browse(query, categoryId)
-                    }
-                )
+                when {
+                    categoryId != null -> EmptyState(
+                        "No products in this aisle yet",
+                        "Explore another aisle or check back later.",
+                        "Refresh",
+                        { vm.browse(category = categoryId, force = true) }
+                    )
+                    query.isNotBlank() -> EmptyState(
+                        "No matches for “$query”",
+                        "Try another product name.",
+                        "Clear search",
+                        {
+                            query = ""
+                            vm.browse()
+                        }
+                    )
+                    else -> EmptyState(
+                        "No products available yet",
+                        "Check back later for products from your store.",
+                        "Refresh",
+                        { vm.browse(force = true) }
+                    )
+                }
             }
         }
-        items(state.products, key = { it.id }) { p ->
+        items(products, key = { it.id }) { p ->
             val first =
                 p.variants.firstOrNull { it.available } ?: p.variants.firstOrNull()
             ProductCard(
@@ -229,8 +267,7 @@ fun CatalogueScreen(
                 { v, q -> vm.quantity(p, v, q) }
             )
         }
-        if (state.products.size <
-            state.total
+        if (catalogueMatches && products.size < state.total
         ) {
             item(span = {
                 GridItemSpan(maxLineSpan)

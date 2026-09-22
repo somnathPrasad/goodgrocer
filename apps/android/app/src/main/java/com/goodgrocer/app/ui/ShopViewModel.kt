@@ -31,6 +31,7 @@ import retrofit2.HttpException
 
 data class ShopState(
     val catalogueLoading: Boolean = false,
+    val catalogueError: String? = null,
     val productLoading: Boolean = false,
     val favouritesLoading: Boolean = false,
     val addressesLoading: Boolean = false,
@@ -108,18 +109,16 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             }.getOrNull()
             done(suggestion)
         }
-    private fun failure(error: Exception) {
-        val message = if (error is HttpException) {
-            runCatching {
-                JSONObject(
-                    error.response()?.errorBody()?.string() ?: "{}"
-                ).getJSONObject("error").getString("message")
-            }.getOrDefault("Please try again.")
-        } else {
-            "Cannot reach your store. Check your connection and try again."
-        }
-        change { it.copy(error = message) }
+    private fun errorMessage(error: Exception): String = if (error is HttpException) {
+        runCatching {
+            JSONObject(
+                error.response()?.errorBody()?.string() ?: "{}"
+            ).getJSONObject("error").getString("message")
+        }.getOrDefault("Please try again.")
+    } else {
+        "Cannot reach your store. Check your connection and try again."
     }
+    private fun failure(error: Exception) = change { it.copy(error = errorMessage(error)) }
     private fun task(block: suspend () -> Unit) = viewModelScope.launch {
         actionBegin()
         try {
@@ -134,7 +133,12 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             actionEnd()
         }
     }
-    fun browse(query: String = "", category: Int? = null, append: Boolean = false) {
+    fun browse(
+        query: String = "",
+        category: Int? = null,
+        append: Boolean = false,
+        force: Boolean = false
+    ) {
         searchJob?.cancel()
         val generation = ++browseGeneration
         searchJob = viewModelScope.launch {
@@ -144,18 +148,19 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     query = query,
                     category = category,
-                    error = null,
+                    catalogueError = null,
+                    catalogueLoading = false,
                     products = if (append) {
                         it.products
                     } else {
-                        cached?.products
-                            ?: if (query.isNotEmpty()) it.products else emptyList()
+                        cached?.products ?: emptyList()
                     },
-                    total = cached?.total ?: it.total,
+                    total = cached?.total ?: 0,
                     page = cached?.page ?: 1
                 )
             }
             if (!append &&
+                !force &&
                 cached != null &&
                 System.currentTimeMillis() - cached.refreshedAt < refreshWindowMs
             ) {
@@ -193,7 +198,9 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             ) {
                 throw error
             } catch (error: Exception) {
-                failure(error)
+                if (generation == browseGeneration) {
+                    change { it.copy(catalogueError = errorMessage(error)) }
+                }
             } finally {
                 if (generation == browseGeneration) {
                     end { it.copy(catalogueLoading = false) }
