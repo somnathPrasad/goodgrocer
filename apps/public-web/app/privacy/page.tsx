@@ -70,8 +70,8 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         For privacy questions, contact Somnath Prasad at{" "}
-        <a href="mailto:somnathprasad559@gmail.com">
-          somnathprasad559@gmail.com
+        <a href="mailto:support@goodgrocer.site">
+          support@goodgrocer.site
         </a>
         .
       </p>

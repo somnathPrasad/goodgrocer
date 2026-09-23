@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="footer-links">
               <Link href="/privacy">Privacy policy</Link>
               <Link href="/delete-account">Delete account</Link>
-              <a href="mailto:somnathprasad559@gmail.com">Contact</a>
+              <a href="mailto:support@goodgrocer.site">Contact</a>
             </div>
             <small>
               © {new Date().getFullYear()} Somnath Prasad · Goodgrocer
