@@ -7,6 +7,7 @@ import java.math.BigDecimal
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
@@ -34,12 +35,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     val repo = AdminRepository(application)
     private val _state = MutableStateFlow(AdminState())
     val state = _state.asStateFlow()
+    private var activeOperations = 0
+    private var loadGeneration = 0
     init {
         viewModelScope.launch {
             if (repo.hasSession()) {
-                try { repo.api.me(); _state.value = _state.value.copy(signedIn = true); refresh() }
-                catch (_: Exception) { repo.saveSession(null); _state.value = _state.value.copy(signedIn = false) }
-            } else _state.value = _state.value.copy(signedIn = false)
+                try { repo.api.me(); _state.update { it.copy(signedIn = true) }; refresh() }
+                catch (_: Exception) { repo.saveSession(null); _state.update { it.copy(signedIn = false) } }
+            } else _state.update { it.copy(signedIn = false) }
         }
         viewModelScope.launch {
             while (true) {
@@ -50,21 +53,25 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
     private fun run(done: (() -> Unit)? = null, block: suspend () -> Unit) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, error = "", notice = "")
+            activeOperations += 1
+            _state.update { it.copy(busy = true, error = "", notice = "") }
             try { block(); done?.invoke() }
             catch (e: Exception) {
                 if (e is HttpException && e.code() == 401) {
                     repo.saveSession(null)
-                    _state.value = _state.value.copy(signedIn = false)
+                    _state.update { it.copy(signedIn = false) }
                 }
-                _state.value = _state.value.copy(error = e.message ?: "Request failed")
-            } finally { _state.value = _state.value.copy(busy = false) }
+                _state.update { it.copy(error = e.message ?: "Request failed") }
+            } finally {
+                activeOperations -= 1
+                _state.update { it.copy(busy = activeOperations > 0) }
+            }
         }
     }
     fun login(username: String, password: String) = run {
         val token = repo.api.login(LoginRequest(username, password))
         repo.saveSession(token.token)
-        _state.value = _state.value.copy(signedIn = true)
+        _state.update { it.copy(signedIn = true) }
         load()
     }
     fun logout() = run {
@@ -73,61 +80,81 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = AdminState(signedIn = false)
         }
     }
-    fun section(name: String) { _state.value = _state.value.copy(section = name, page = 1); refresh() }
-    fun page(value: Int) { _state.value = _state.value.copy(page = value.coerceAtLeast(1)); refresh() }
-    fun query(value: String) { _state.value = _state.value.copy(query = value, page = 1); refresh() }
-    fun status(value: String) { _state.value = _state.value.copy(status = value, page = 1); refresh() }
-    fun category(value: Int?) { _state.value = _state.value.copy(category = value, page = 1); refresh() }
-    fun availability(value: Boolean?) { _state.value = _state.value.copy(availability = value, page = 1); refresh() }
+    fun section(name: String) { _state.update { it.copy(section = name, page = 1) }; refresh() }
+    fun page(value: Int) { _state.update { it.copy(page = value.coerceAtLeast(1)) }; refresh() }
+    fun query(value: String) { _state.update { it.copy(query = value, page = 1) }; refresh() }
+    fun status(value: String) { _state.update { it.copy(status = value, page = 1) }; refresh() }
+    fun category(value: Int?) { _state.update { it.copy(category = value, page = 1) }; refresh() }
+    fun availability(value: Boolean?) { _state.update { it.copy(availability = value, page = 1) }; refresh() }
     fun refresh() = run { load() }
     private suspend fun load() {
+        val generation = ++loadGeneration
         val s = state.value
         val brands = repo.api.brands()
         val categories = repo.api.categories()
-        _state.value = _state.value.copy(brands = brands, categories = categories)
+        if (generation != loadGeneration) return
+        _state.update { it.copy(brands = brands, categories = categories) }
         when (s.section) {
-            "Dashboard" -> _state.value = _state.value.copy(dashboard = repo.api.dashboard())
-            "Orders" -> _state.value = _state.value.copy(orders = repo.api.orders(s.page, s.status.ifBlank { null }))
-            "Products" -> _state.value = _state.value.copy(products = repo.api.products(s.page, s.query.ifBlank { null }, s.category, s.availability))
+            "Dashboard" -> {
+                val dashboard = repo.api.dashboard()
+                if (generation == loadGeneration) _state.update { it.copy(dashboard = dashboard) }
+            }
+            "Orders" -> {
+                val orders = repo.api.orders(s.page, s.status.ifBlank { null })
+                if (generation == loadGeneration) _state.update { it.copy(orders = orders) }
+            }
+            "Products" -> {
+                val products = repo.api.products(s.page, s.query.ifBlank { null }, s.category, s.availability)
+                if (generation == loadGeneration) _state.update { it.copy(products = products) }
+            }
         }
     }
-    fun openOrder(id: Int) = run { _state.value = _state.value.copy(selectedOrder = repo.api.order(id)) }
-    fun closeOrder() { _state.value = _state.value.copy(selectedOrder = null) }
+    fun openOrder(id: Int) = run {
+        val order = repo.api.order(id)
+        _state.update { it.copy(selectedOrder = order) }
+    }
+    fun closeOrder() { _state.update { it.copy(selectedOrder = null) } }
     fun transition(status: String, reason: String?, done: () -> Unit) = run(done) {
         val id = state.value.selectedOrder?.id ?: return@run
-        _state.value = _state.value.copy(selectedOrder = repo.api.status(id, StatusInput(status, reason)))
+        val order = repo.api.status(id, StatusInput(status, reason))
+        _state.update { it.copy(selectedOrder = order) }
         load()
     }
     fun markPaid(done: () -> Unit) = run(done) {
         val id = state.value.selectedOrder?.id ?: return@run
-        _state.value = _state.value.copy(selectedOrder = repo.api.markPaid(id))
+        val order = repo.api.markPaid(id)
+        _state.update { it.copy(selectedOrder = order) }
         load()
     }
-    fun openProduct(id: Int) = run { _state.value = _state.value.copy(selectedProduct = repo.api.product(id)) }
-    fun closeProduct() { _state.value = _state.value.copy(selectedProduct = null) }
+    fun openProduct(id: Int) = run {
+        val product = repo.api.product(id)
+        _state.update { it.copy(selectedProduct = product) }
+    }
+    fun closeProduct() { _state.update { it.copy(selectedProduct = null) } }
     fun saveBrand(id: Int?, input: BrandInput, done: () -> Unit) = run(done) {
         if (id == null) repo.api.createBrand(input) else repo.api.editBrand(id, input)
         load()
-        _state.value = _state.value.copy(notice = "Brand saved")
+        _state.update { it.copy(notice = "Brand saved") }
     }
     fun saveCategory(id: Int?, input: CategoryInput, done: () -> Unit) = run(done) {
         if (id == null) repo.api.createCategory(input) else repo.api.editCategory(id, input)
         load()
-        _state.value = _state.value.copy(notice = "Category saved")
+        _state.update { it.copy(notice = "Category saved") }
     }
     fun saveProduct(id: Int?, input: ProductInput, done: () -> Unit) = run(done) {
         val product = if (id == null) repo.api.createProduct(input) else repo.api.editProduct(id, input)
-        _state.value = _state.value.copy(selectedProduct = product)
+        _state.update { it.copy(selectedProduct = product) }
         load()
-        _state.value = _state.value.copy(notice = "Product saved")
+        _state.update { it.copy(notice = "Product saved") }
     }
     fun saveVariant(productId: Int, variantId: Int?, input: VariantInput, done: () -> Unit) = run(done) {
         require(input.mrp.toBigDecimal() >= input.selling_price.toBigDecimal()) { "Selling price cannot exceed MRP" }
         require(input.selling_price.toBigDecimal() >= BigDecimal.ZERO) { "Price cannot be negative" }
         if (variantId == null) repo.api.createVariant(productId, input) else repo.api.editVariant(productId, variantId, input)
-        _state.value = _state.value.copy(selectedProduct = repo.api.product(productId))
+        val product = repo.api.product(productId)
+        _state.update { it.copy(selectedProduct = product) }
         load()
-        _state.value = _state.value.copy(notice = "Variant saved")
+        _state.update { it.copy(notice = "Variant saved") }
     }
     fun upload(bytes: ByteArray, mime: String, done: (String) -> Unit) = run {
         require(bytes.size <= 5 * 1024 * 1024) { "Choose an image under 5 MB" }

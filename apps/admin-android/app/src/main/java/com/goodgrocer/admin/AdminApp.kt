@@ -34,11 +34,13 @@ import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
@@ -73,8 +75,30 @@ private fun label(value: String) = value.replace('_', ' ').lowercase().replaceFi
 @Composable
 fun AdminApp(vm: AdminViewModel) {
     val s by vm.state.collectAsState()
+    Box(Modifier.fillMaxSize()) {
+        AdminContent(s, vm)
+        if (s.busy) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().align(Alignment.TopCenter),
+                color = Lime,
+                trackColor = Color.Transparent
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminContent(s: AdminState, vm: AdminViewModel) {
     if (s.signedIn == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Opening store desk…") }
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(color = Green)
+            Spacer(Modifier.height(16.dp))
+            Text("Opening store desk…")
+        }
         return
     }
     if (s.signedIn == false) { LoginScreen(s, vm); return }

@@ -29,6 +29,9 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# Android release artifacts exported by Android Studio
+**/app/release/
+
 # Frontend dependencies and build output
 node_modules/
 dist/
