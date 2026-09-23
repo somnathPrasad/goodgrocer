@@ -236,6 +236,10 @@ def transition(db, order_id, data):
             )
         order.cancellation_reason = data.reason
     order.status = data.status
+    if order.customer_deleted_at is not None and data.status in {"DELIVERED", "CANCELLED"}:
+        from app.services.customer_deletion import erase_delivery_details
+
+        erase_delivery_details(order)
     db.commit()
     return order
 

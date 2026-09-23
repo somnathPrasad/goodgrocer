@@ -142,3 +142,12 @@ Code: `apps/android/app/src/main/java/com/goodgrocer/app/ui/ShopApp.kt`
 The code-only review is in the prior conversation. Device screenshots were
 captured during that session for inspection but are intentionally not committed
 because they contain account, order, and address details.
+# Customer deletion and privacy
+
+The Account screen has an Information section with a Privacy policy link for all
+customers. Signed-in customers also see a visually separate `Delete Goodgrocer
+account` action below sign-out. Deletion uses a dedicated screen that explains
+the consequences, reauthenticates with the currently signed-in Google identity,
+shows that identity, and requires final destructive confirmation. Success clears
+all local customer and cart state and replaces navigation with the signed-out
+entry experience.

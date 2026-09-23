@@ -20,7 +20,9 @@ def get_db():
 def session_for(request: Request, db: Session, admin: bool):
     if admin:
         authorization = request.headers.get("authorization", "")
-        bearer = authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
+        bearer = (
+            authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
+        )
         token = bearer or request.cookies.get("gg_admin", "")
         if not bearer and request.method not in {"GET", "HEAD", "OPTIONS"}:
             if request.headers.get("origin") != get_settings().admin_origin:
@@ -40,6 +42,15 @@ def session_for(request: Request, db: Session, admin: bool):
 
 def customer(request: Request, db: Session = Depends(get_db)) -> Customer:
     return db.get(Customer, session_for(request, db, False).customer_id)
+
+
+def optional_customer_id(request: Request, db: Session) -> int | None:
+    authorization = request.headers.get("authorization", "")
+    token = authorization.removeprefix("Bearer ") if authorization.startswith("Bearer ") else ""
+    session = db.get(AuthSession, digest(token)) if token else None
+    if session is None or aware(session.expires_at) <= now() or session.customer_id is None:
+        return None
+    return session.customer_id
 
 
 def admin(request: Request, db: Session = Depends(get_db)) -> Admin:

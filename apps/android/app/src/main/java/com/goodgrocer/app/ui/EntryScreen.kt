@@ -47,16 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
-import androidx.credentials.exceptions.NoCredentialException
 import com.goodgrocer.app.BuildConfig
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.launch
 
@@ -123,38 +116,11 @@ fun EntryScreen(vm: ShopViewModel, done: () -> Unit) {
                         pickingAccount = true
                         scope.launch {
                             try {
-                                val manager = CredentialManager.create(context)
-                                val googleOption = GetGoogleIdOption.Builder()
-                                    .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                                    .setFilterByAuthorizedAccounts(false)
-                                    .setAutoSelectEnabled(false)
-                                    .build()
-                                val request = GetCredentialRequest.Builder()
-                                    .addCredentialOption(googleOption).build()
-                                val credential = try {
-                                    manager.getCredential(context as Activity, request).credential
-                                } catch (_: NoCredentialException) {
-                                    // The button flow also offers accounts that the sheet cannot show.
-                                    val buttonOption = GetSignInWithGoogleOption.Builder(
-                                        BuildConfig.GOOGLE_WEB_CLIENT_ID
-                                    ).build()
-                                    manager.getCredential(
-                                        context,
-                                        GetCredentialRequest.Builder()
-                                            .addCredentialOption(buttonOption).build()
-                                    ).credential
-                                }
-                                if (credential is CustomCredential &&
-                                    credential.type ==
-                                    GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                ) {
-                                    val token = GoogleIdTokenCredential.createFrom(
-                                        credential.data
-                                    ).idToken
-                                    vm.googleSignIn(token, done)
-                                } else {
-                                    signInError = "Choose a Google account to continue."
-                                }
+                                val credential = pickGoogleAccount(
+                                    context as Activity,
+                                    BuildConfig.GOOGLE_WEB_CLIENT_ID
+                                )
+                                vm.googleSignIn(credential.idToken, done)
                             } catch (_: GetCredentialCancellationException) {
                                 // The entry screen remains available if the sheet is dismissed.
                             } catch (_: GetCredentialException) {
@@ -162,6 +128,8 @@ fun EntryScreen(vm: ShopViewModel, done: () -> Unit) {
                             } catch (_: GoogleIdTokenParsingException) {
                                 signInError =
                                     "Google sign-in returned an unreadable account. Please try again."
+                            } catch (_: IllegalStateException) {
+                                signInError = "Choose a Google account to continue."
                             } finally {
                                 pickingAccount = false
                             }

@@ -26,6 +26,11 @@ android {
             "GOOGLE_WEB_CLIENT_ID",
             "\"${providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").getOrElse("")}\""
         )
+        buildConfigField(
+            "String",
+            "PUBLIC_WEB_URL",
+            "\"${providers.gradleProperty("PUBLIC_WEB_URL").getOrElse("http://10.0.2.2:3001")}\""
+        )
         val mapsKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
             .getOrElse(localProperties.getProperty("GOOGLE_MAPS_API_KEY", ""))
         manifestPlaceholders["googleMapsApiKey"] = mapsKey

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,6 +61,8 @@ fun AccountScreen(
     login: () -> Unit,
     onAddresses: () -> Unit,
     onOrders: () -> Unit,
+    onPrivacy: () -> Unit,
+    onDeleteAccount: () -> Unit,
     logout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -75,7 +78,9 @@ fun AccountScreen(
 
         if (!signedIn) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -101,8 +106,15 @@ fun AccountScreen(
                             }
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Welcome to Goodgrocer", style = MaterialTheme.typography.titleMedium)
-                            Text("Sign in with Google for full access", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(
+                                "Welcome to Goodgrocer",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "Sign in with Google for full access",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                     Text(
@@ -143,6 +155,14 @@ fun AccountScreen(
             )
         }
 
+        SectionTitle("Information")
+        AccountMenuItem(
+            icon = Icons.Outlined.PrivacyTip,
+            title = "Privacy policy",
+            subtitle = "How Goodgrocer handles your information",
+            onClick = onPrivacy
+        )
+
         if (signedIn) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
@@ -150,9 +170,23 @@ fun AccountScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.AutoMirrored.Outlined.Logout,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(Modifier.width(8.dp))
-                Text("Sign out of Goodgrocer", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                Text(
+                    "Sign out of Goodgrocer",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            TextButton(
+                onClick = onDeleteAccount,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) {
+                Text("Delete Goodgrocer account", color = MaterialTheme.colorScheme.error)
             }
         }
 
@@ -163,7 +197,11 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text("Sign out?") },
-            text = { Text("You will need to sign in again with Google to access your synced addresses and order history.") },
+            text = {
+                Text(
+                    "You will need to sign in again with Google to access your synced addresses and order history."
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutDialog = false
@@ -182,12 +220,7 @@ fun AccountScreen(
 }
 
 @Composable
-fun AccountMenuItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
+fun AccountMenuItem(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -210,12 +243,21 @@ fun AccountMenuItem(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
             Icon(

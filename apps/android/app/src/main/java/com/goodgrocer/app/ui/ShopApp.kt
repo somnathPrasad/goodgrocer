@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -39,6 +40,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.goodgrocer.app.BuildConfig
 import com.goodgrocer.app.data.cartSubtotal
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -54,6 +56,7 @@ fun ShopApp(vm: ShopViewModel) {
     val cart by vm.cart.collectAsStateWithLifecycle()
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     val nav = rememberNavController()
+    val uriHandler = LocalUriHandler.current
     val entry by nav.currentBackStackEntryAsState()
     val startDestination = remember { if (signedIn) "home" else "entry" }
     val route = entry?.destination?.route ?: startDestination
@@ -91,6 +94,7 @@ fun ShopApp(vm: ShopViewModel) {
                         route.startsWith("product") -> "From your store"
                         route.startsWith("category") -> "Shop by aisle"
                         route.startsWith("order/") -> "Your order"
+                        route == "delete-account" -> "Delete account"
                         else -> route.replaceFirstChar { it.uppercase() }
                     }
                 )
@@ -111,8 +115,11 @@ fun ShopApp(vm: ShopViewModel) {
     }, bottomBar = {
         Column {
             if (cart.isNotEmpty() &&
-                (route in listOf("home", "search", "favourites") ||
-                    route.startsWith("category/") || route.startsWith("product/"))
+                (
+                    route in listOf("home", "search", "favourites") ||
+                        route.startsWith("category/") ||
+                        route.startsWith("product/")
+                    )
             ) {
                 val basketSummary = remember(cart) {
                     val count = cart.sumOf { it.quantity }
@@ -293,8 +300,21 @@ fun ShopApp(vm: ShopViewModel) {
                     login = { authenticated("account") },
                     onAddresses = { authenticated("addresses") },
                     onOrders = { authenticated("orders") },
+                    onPrivacy = {
+                        uriHandler.openUri(
+                            BuildConfig.PUBLIC_WEB_URL.trimEnd('/') + "/privacy"
+                        )
+                    },
+                    onDeleteAccount = { authenticated("delete-account") },
                     logout = { vm.logout() }
                 )
+            }
+            composable("delete-account") {
+                if (!signedIn) {
+                    SignInPrompt { authenticated("delete-account") }
+                } else {
+                    DeleteAccountScreen(vm) { nav.popBackStack() }
+                }
             }
         }
     }

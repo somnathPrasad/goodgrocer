@@ -53,4 +53,9 @@ class Repository(context: Context) {
         local.saveToken(null)
         _signedIn.value = false
     }
+    fun clearCustomerData() {
+        local.clearAll()
+        _cart.value = emptyList()
+        _signedIn.value = false
+    }
 }

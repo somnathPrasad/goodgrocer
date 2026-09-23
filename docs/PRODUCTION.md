@@ -2,6 +2,15 @@
 
 ## External blockers
 
+### Public website
+
+Publish the public website privacy policy under the operator name Somnath Prasad
+with `somnathprasad559@gmail.com` as the privacy contact. Configure its Google web
+client for the production origin and supply the Play Store URL when the listing
+is available. Deploy it separately from the owner portal with server-only
+`API_URL`, public `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`, and optional
+`NEXT_PUBLIC_PLAY_STORE_URL`.
+
 ### Google sign-in
 
 Create Google OAuth clients for the Android package and release signing
@@ -56,6 +65,9 @@ can cancel; the customer may reorder. No money is transferred.
 - Schedule database/media backups and practice restore. Establish log rotation
   and retention, session/rate-limit/legacy-OTP cleanup and operational alerts.
   Request logs contain method/path/status/duration/request ID, not auth bodies.
+- Run `uv run --directory services/api python -m app.cli erase-expired-customer-data`
+  at least daily so active orders cannot retain deleted-customer delivery details
+  beyond their 30-day limit.
 - Configure the Android HTTPS API URL, release signing and store distribution.
   Test on physical devices, TalkBack, larger text and unreliable networks.
 - Confirm store contact information and delivery fee.

@@ -258,6 +258,30 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         repository.signIn(repository.api.googleLogin(GoogleLoginRequest(idToken)).token)
         done()
     }
+    fun deleteAccount(idToken: String) = task {
+        repository.api.deleteAccount(GoogleLoginRequest(idToken))
+        repository.clearCustomerData()
+        try {
+            CredentialManager.create(getApplication()).clearCredentialState(
+                ClearCredentialStateRequest()
+            )
+        } catch (_: ClearCredentialException) {
+            // Customer data and the server identity are already deleted.
+        }
+        requestKey = repository.newRequestKey()
+        favouritesCache.clear()
+        addressesCache.clear()
+        ordersCache.clear()
+        orderCache.clear()
+        catalogueCache.clear()
+        productCache.clear()
+        favouritesLoaded = false
+        addressesLoaded = false
+        ordersLoaded = false
+        change {
+            ShopState(message = "Your Goodgrocer account was deleted.")
+        }
+    }
     fun logout() = task {
         try {
             repository.api.logout()

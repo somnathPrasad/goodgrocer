@@ -53,3 +53,22 @@ providers remain unselected, so no real message or money transfer was tested.
 - Admin TypeScript check and generated OpenAPI types: passed.
 - A live Google account exchange was not tested because OAuth client IDs and
   Android signing fingerprints have not been configured for this environment.
+
+## Customer deletion and public website — 2026-09-23
+
+- PostgreSQL API/business suite and isolated Alembic migration cycle: 49 passed.
+- Python Ruff lint and format checks: passed.
+- Customer Android `ktlintCheck`, six unit tests, `lintDebug` and `assembleDebug`:
+  passed.
+- Public website Prettier check, TypeScript check and Next.js production build:
+  passed. The home, privacy and account-deletion pages returned HTTP 200 locally;
+  malformed deletion input returned HTTP 422.
+- Admin web TypeScript check, Prettier check, three proxy tests and production
+  build: passed.
+- Admin Android debug compilation, lint and assembly: passed.
+- `git diff --check`: passed.
+
+A live Google deletion was not performed because production OAuth clients and
+origins are not configured in this environment. Production still requires the
+public website deployment, Android public-site URL, Play Store URL and a daily
+schedule for `erase-expired-customer-data`.

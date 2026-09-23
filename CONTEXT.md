@@ -36,6 +36,38 @@ Previously loaded favourites, orders, and addresses may remain visible during a
 refresh, but are cleared immediately when the customer signs out.
 _Avoid_: showing one customer's data after logout
 
+**Customer**:
+The Goodgrocer identity created when a person first authenticates with Google.
+_Avoid_: Google account, user account
+
+**Customer deletion**:
+Permanent removal of a Customer's authentication identity, sessions, saved addresses, favourites, and other reusable personal data.
+_Avoid_: sign-out, Google account deletion, order cancellation
+
+**Deletion path**:
+An independently accessible native or web experience in which a Customer authenticates with Google and explicitly confirms Customer deletion.
+_Avoid_: support request, sign-out flow
+
+**Deletion authorization**:
+A freshly verified Google identity presented only to authorize Customer deletion without creating a new Customer.
+_Avoid_: existing session alone, account lookup
+
+**Deletion confirmation**:
+The final informed Customer action that permanently authorizes deletion after its consequences and selected Google identity are shown.
+_Avoid_: typed confirmation phrase, support approval
+
+**Public website**:
+Goodgrocer's customer-facing website for product information, store links, and account-support experiences such as the web Deletion path.
+_Avoid_: web shop, owner portal
+
+**Retained order record**:
+An order snapshot kept independently of a deleted Customer only as needed for fulfilment, accounting, fraud prevention, or other disclosed legal obligations.
+_Avoid_: active customer profile
+
+**Pending order erasure**:
+The temporary retention of an active order's delivery details after Customer deletion until that order is delivered, cancelled, or reaches the 30-day retention limit.
+_Avoid_: indefinite order history retention
+
 **Immediate product detail**:
 Product detail begins with the matching cached catalogue product when available,
 then reconciles with the current store response.
@@ -64,6 +96,20 @@ _Avoid_: first-release checkout option
   imply that prices or availability are permanent.
 - A **First-load placeholder** is distinct from **Operation progress**.
 - **Authenticated continuity** ends at logout.
+- **Customer deletion** ends the **Customer** identity and every authenticated session permanently.
+- On Android, **Customer deletion** also clears the local cart, checkout key, authenticated caches, deletion credentials, and navigation history; sign-out continues to preserve the cart.
+- The native and web **Deletion paths** invoke the same immediate **Customer deletion** operation after separate authentication and confirmation experiences.
+- Each **Deletion path** requires **Deletion authorization** and reports success when the Customer has already been deleted.
+- Each **Deletion path** explains the consequences, obtains **Deletion authorization**, identifies the selected Google account, and then requires **Deletion confirmation**.
+- In the native **Deletion path**, **Deletion authorization** must identify the currently authenticated **Customer**; selecting a different Google account leaves both Customers unchanged.
+- Authenticating again after **Customer deletion** creates a new **Customer** without restoring deleted data or prior order access.
+- The web **Deletion path** belongs to the **Public website**, which remains separate from the owner portal and does not offer catalogue browsing or ordering.
+- **Customer deletion** does not cancel an active order; active and historical orders continue as **Retained order records**.
+- A **Retained order record** is detached from the deleted **Customer** and retains non-personal commercial facts.
+- A **Retained order record** may record when its Customer was deleted, but does not retain a hidden or anonymized Customer identity.
+- Customer deletion removes any payment-attempt records associated with retained orders in the cash-on-delivery release; payment method and payment state remain commercial facts.
+- Terminal **Retained order records** have their delivery address, coordinates, recipient name, and contact phone erased immediately.
+- **Pending order erasure** keeps those delivery details for an active order only until it becomes delivered, cancelled, or reaches 30 days after Customer deletion, then erases them automatically.
 - **Immediate product detail** is unavailable only when the product has not
   already been loaded in the current session.
 - A **Refresh window** limits background traffic without preventing explicit
@@ -104,6 +150,9 @@ _Avoid_: first-release checkout option
 > **Domain expert:** "No. Refresh active content after a short window, but let
 > an explicit refresh happen immediately."
 >
+> **Dev:** "Does deleting a Customer cancel an order that is out for delivery?"
+> **Domain expert:** "No. Remove the Customer identity and reusable personal data; the store completes the order from its retained snapshot."
+>
 > **Dev:** "Can the customer collect an order and pay cash at the store in the first release?"
 > **Domain expert:** "No. The first release accepts delivery orders paid in cash on delivery."
 
@@ -114,3 +163,5 @@ _Avoid_: first-release checkout option
   placeholder only when that screen has no loaded content.
 - "COD" previously also labeled cash at pickup. For the first release it means
   cash collected on delivery; pickup is unavailable for new orders.
+- "Account deletion" means **Customer deletion** within Goodgrocer. It does not delete the person's Google account or cancel their orders.
+- "Customer web" does not mean a web shop in the first release; the **Public website** provides information, store links, and account support only.

@@ -140,6 +140,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/account/deletion": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Delete Account */
+    post: operations["delete_account_api_v1_account_deletion_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/addresses": {
     parameters: {
       query?: never;
@@ -152,6 +169,23 @@ export interface paths {
     put?: never;
     /** Create Address */
     post: operations["create_address_api_v1_addresses_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/addresses/reverse-geocode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reverse Geocode */
+    get: operations["reverse_geocode_api_v1_addresses_reverse_geocode_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -834,7 +868,11 @@ export interface components {
       /** Order Number */
       order_number: string;
       /** Customer Phone */
-      customer_phone: string;
+      customer_phone: string | null;
+      /** Customer Deleted At */
+      customer_deleted_at: string | null;
+      /** Delivery Details Erase At */
+      delivery_details_erase_at: string | null;
       /** Fulfilment Type */
       fulfilment_type: string;
       /** Status */
@@ -1272,6 +1310,37 @@ export interface operations {
       };
     };
   };
+  delete_account_api_v1_account_deletion_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GoogleLoginInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   addresses_api_v1_addresses_get: {
     parameters: {
       query?: never;
@@ -1312,6 +1381,38 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AddressOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reverse_geocode_api_v1_addresses_reverse_geocode_get: {
+    parameters: {
+      query: {
+        latitude: number | string;
+        longitude: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

@@ -202,7 +202,9 @@ class PaymentOut(Schema):
 class OrderOut(Schema):
     id: int
     order_number: str
-    customer_phone: str
+    customer_phone: str | None
+    customer_deleted_at: datetime | None
+    delivery_details_erase_at: datetime | None
     fulfilment_type: str
     status: str
     payment_method: str

@@ -8,8 +8,18 @@ from pydantic import ValidationError
 
 from app.api.routes import v1
 from app.core.config import Settings
-from app.models.domain import Address, Customer, Order, OrderItem, PaymentAttempt, now
-from app.schemas.domain import ProductInput, VariantInput
+from app.models.domain import (
+    Address,
+    AuthSession,
+    Customer,
+    Favourite,
+    Order,
+    OrderItem,
+    PaymentAttempt,
+    now,
+)
+from app.schemas.domain import ProductInput, TransitionInput, VariantInput
+from app.services.auth import new_session
 
 
 def cart(data, **changes):
@@ -393,6 +403,145 @@ def test_google_sign_in_uses_verified_subject_and_logout(client, db, monkeypatch
     assert client.get("/api/v1/orders", headers=headers).status_code == 200
     assert client.post("/api/v1/auth/logout", headers=headers).status_code == 204
     assert client.get("/api/v1/orders", headers=headers).status_code == 401
+
+
+def test_customer_deletion_detaches_orders_and_erases_customer_data(client, db, data, monkeypatch):
+    customer = Customer(google_subject="delete-google-subject")
+    db.add(customer)
+    db.flush()
+    address = Address(
+        customer_id=customer.id,
+        recipient_name="Delete Me",
+        phone="+919999999999",
+        line1="Private road",
+        city="Town",
+        state="Karnataka",
+    )
+    db.add_all([address, Favourite(customer_id=customer.id, product_id=data["product"].id)])
+    common = {
+        "customer_id": customer.id,
+        "customer_phone": "+919999999999",
+        "request_hash": "1" * 64,
+        "fulfilment_type": "DELIVERY",
+        "payment_method": "COD",
+        "subtotal": Decimal("100.25"),
+        "delivery_fee": Decimal("0.00"),
+        "discount": Decimal("0.00"),
+        "total": Decimal("100.25"),
+        "address_snapshot": {
+            "recipient_name": "Delete Me",
+            "phone": "+919999999999",
+            "line1": "Private road",
+            "city": "Town",
+            "state": "Karnataka",
+        },
+    }
+    active = Order(
+        order_number="GG-DELETE-ACTIVE",
+        idempotency_key="delete-active-order",
+        **common,
+    )
+    expiring = Order(
+        order_number="GG-DELETE-EXPIRING",
+        idempotency_key="delete-expiring-order",
+        **common,
+    )
+    terminal = Order(
+        order_number="GG-DELETE-TERMINAL",
+        idempotency_key="delete-terminal-order",
+        status="DELIVERED",
+        **common,
+    )
+    db.add_all([active, expiring, terminal])
+    db.flush()
+    db.add(
+        PaymentAttempt(
+            order_id=active.id,
+            provider="development",
+            reference="delete-this-attempt",
+            amount=Decimal("100.25"),
+        )
+    )
+    db.commit()
+    session = new_session(db, customer_id=customer.id)
+
+    monkeypatch.setattr(
+        "app.services.auth.get_settings",
+        lambda: Settings(google_web_client_id="web-client.apps.googleusercontent.com"),
+    )
+    monkeypatch.setattr(
+        "app.services.auth.google_id_token.verify_oauth2_token",
+        lambda token, request, audience: {
+            "sub": "delete-google-subject",
+            "email": "delete@example.com",
+        },
+    )
+    headers = {"Authorization": "Bearer " + session["token"]}
+    response = client.post(
+        "/api/v1/account/deletion",
+        json={"id_token": "fresh-delete-token"},
+        headers=headers,
+    )
+    assert response.status_code == 204, response.text
+
+    db.expire_all()
+    assert db.get(Customer, customer.id) is None
+    assert db.query(Address).filter_by(customer_id=customer.id).count() == 0
+    assert db.query(Favourite).filter_by(customer_id=customer.id).count() == 0
+    assert db.query(AuthSession).filter_by(customer_id=customer.id).count() == 0
+    assert db.query(PaymentAttempt).filter_by(order_id=active.id).count() == 0
+    active = db.get(Order, active.id)
+    terminal = db.get(Order, terminal.id)
+    assert active.customer_id is None and active.customer_deleted_at is not None
+    assert active.customer_phone == "+919999999999" and active.address_snapshot is not None
+    assert active.delivery_details_erase_at - active.customer_deleted_at == timedelta(days=30)
+    assert terminal.customer_id is None and terminal.customer_phone is None
+    assert terminal.address_snapshot is None
+    assert client.get("/api/v1/orders", headers=headers).status_code == 401
+
+    from app.services import orders
+    from app.services.customer_deletion import erase_expired_delivery_details
+
+    orders.transition(
+        db,
+        active.id,
+        TransitionInput(status="CANCELLED", reason="Customer requested cancellation"),
+    )
+    db.refresh(active)
+    assert active.customer_phone is None and active.address_snapshot is None
+
+    assert erase_expired_delivery_details(db, expiring.delivery_details_erase_at) == 1
+    db.refresh(expiring)
+    assert expiring.customer_phone is None and expiring.address_snapshot is None
+
+    # Repeating from the sessionless web path is intentionally successful.
+    repeated = client.post("/api/v1/account/deletion", json={"id_token": "fresh-delete-token"})
+    assert repeated.status_code == 204
+
+
+def test_customer_deletion_rejects_different_google_account(client, db, monkeypatch):
+    current = Customer(google_subject="current-google-subject")
+    other = Customer(google_subject="other-google-subject")
+    db.add_all([current, other])
+    db.commit()
+    session = new_session(db, customer_id=current.id)
+    monkeypatch.setattr(
+        "app.services.auth.get_settings",
+        lambda: Settings(google_web_client_id="web-client.apps.googleusercontent.com"),
+    )
+    monkeypatch.setattr(
+        "app.services.auth.google_id_token.verify_oauth2_token",
+        lambda token, request, audience: {"sub": "other-google-subject"},
+    )
+    response = client.post(
+        "/api/v1/account/deletion",
+        json={"id_token": "other-token"},
+        headers={"Authorization": "Bearer " + session["token"]},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "GOOGLE_ACCOUNT_MISMATCH"
+    assert db.get(Customer, current.id) is not None
+    assert db.get(Customer, other.id) is not None
 
 
 def test_google_customer_pickup_is_unavailable(client, db, data):

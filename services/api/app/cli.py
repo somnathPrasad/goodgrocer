@@ -136,12 +136,26 @@ def bootstrap():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["seed", "bootstrap-admin", "export-openapi"])
+    parser.add_argument(
+        "command",
+        choices=[
+            "seed",
+            "bootstrap-admin",
+            "export-openapi",
+            "erase-expired-customer-data",
+        ],
+    )
     args = parser.parse_args()
     if args.command == "seed":
         seed()
     elif args.command == "bootstrap-admin":
         bootstrap()
+    elif args.command == "erase-expired-customer-data":
+        from app.services.customer_deletion import erase_expired_delivery_details
+
+        with SessionLocal() as db:
+            count = erase_expired_delivery_details(db)
+        print(f"Erased delivery details from {count} retained order(s).")
     else:
         from app.main import app
 

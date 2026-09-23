@@ -277,3 +277,33 @@ Operators configure separate Google Maps Android and server Geocoding keys,
 billing and quotas, and a map center near the store. Geocoding is only a
 suggestion; customers must supply a house or street and contact details. The
 Google service may be unavailable, so manual entry remains functional.
+
+## ADR-011: Delete Customer identity while retaining fulfilment-safe orders
+
+- Date: 2026-09-23
+- Status: Accepted
+
+### Context
+
+Google Play requires account deletion from the Android app and an independently
+accessible web resource. Goodgrocer must remove reusable Customer data without
+cancelling an order that the store is already fulfilling.
+
+### Decision
+
+Add an independent Next.js public website for product information, privacy and
+web Customer deletion. Both native and web deletion paths use a freshly verified
+Google identity and the same immediate backend operation. Deletion removes the
+Customer, sessions, saved addresses, favourites and payment attempts, then
+detaches orders without keeping a Customer tombstone. Terminal orders lose
+delivery details immediately; active orders lose them at terminal status or 30
+days after deletion, whichever comes first. Non-personal commercial order facts
+remain available to the owner.
+
+### Consequences
+
+Orders carry explicit Customer-deletion and delivery-erasure timestamps, and the
+owner clients show the retention state. A daily cleanup command enforces the
+30-day maximum. Android deletion additionally clears all local shopping and
+customer data. Reauthentication after deletion creates a new Customer without
+restoring history.

@@ -1,16 +1,18 @@
 # Goodgrocer
 
 A single-store grocery ordering app: native Android shopping and owner apps,
-a retained Next.js owner portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
+a public Next.js website, a retained Next.js owner portal, and one FastAPI/PostgreSQL backend. Browse anonymously, keep a local
 basket, sign in with Google, save addresses/favourites, order for delivery with
 cash on delivery, track orders and reorder. The owner manages catalogue/images/availability
-and incoming orders. No customer web storefront or inventory quantity tracking.
+and incoming orders. The public website provides information, Play Store links,
+privacy and account deletion; it is not a customer web storefront. No inventory quantity tracking.
 
 ## Repository
 
 ```text
 apps/android/             Kotlin, Compose, Material 3, ViewModel, Retrofit/Moshi
 apps/admin-android/       Native Android store-owner app
+apps/public-web/          Next.js public information, privacy and account deletion
 apps/admin-web/           Next.js, React, TypeScript, custom CSS
 services/api/
   app/api/               Versioned customer/admin routes and authorization
@@ -50,6 +52,8 @@ uv run --directory services/api python -m app.cli seed
 uv run --directory services/api python -m app.cli bootstrap-admin
 npm ci --prefix apps/admin-web
 cp apps/admin-web/.env.example apps/admin-web/.env.local
+npm ci --prefix apps/public-web
+cp apps/public-web/.env.example apps/public-web/.env.local
 ```
 
 Bootstrap prompts for a username and a confirmed password of at least 12
@@ -83,6 +87,16 @@ curl http://localhost:8000/health
 curl 'http://localhost:8000/api/v1/products?page=1'
 ```
 
+Start the public website on port 3001:
+
+```sh
+npm run dev --prefix apps/public-web
+```
+
+Open **http://localhost:3001**. Configure `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+for `/delete-account`. Set `NEXT_PUBLIC_PLAY_STORE_URL` after the Play listing
+is available; the site shows “Coming soon” while it is unset.
+
 ### Android
 
 Open `apps/android` in Android Studio, let Gradle sync, select an emulator and
@@ -112,7 +126,8 @@ builds. Release builds require an HTTPS endpoint and your own signing setup:
 ```sh
 ./apps/android/gradlew -p apps/android :app:assembleRelease \
   -PAPI_URL=https://api.example.com/ \
-  -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com
+  -PGOOGLE_WEB_CLIENT_ID=your-web-oauth-client.apps.googleusercontent.com \
+  -PPUBLIC_WEB_URL=https://www.example.com
 ```
 
 To enable the delivery pin picker, enable Maps SDK for Android and Geocoding API

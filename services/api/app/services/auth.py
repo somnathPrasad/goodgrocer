@@ -64,13 +64,8 @@ def google_login(db: Session, token: str, ip: str):
     if not client_id:
         raise DomainError("GOOGLE_NOT_CONFIGURED", "Google sign-in is not configured", 503)
     rate_limit(db, "google-ip:" + digest(ip), 30, 900)
-    try:
-        claims = google_id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
-    except (ValueError, TransportError):
-        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401) from None
-    subject = claims.get("sub")
-    if not isinstance(subject, str) or not subject or len(subject) > 255:
-        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401)
+    claims = verify_google_identity(token, client_id)
+    subject = claims["sub"]
     db.execute(
         insert(Customer)
         .values(google_subject=subject)
@@ -78,6 +73,20 @@ def google_login(db: Session, token: str, ip: str):
     )
     customer = db.scalar(select(Customer).where(Customer.google_subject == subject))
     return new_session(db, customer_id=customer.id)
+
+
+def verify_google_identity(token: str, client_id: str | None = None):
+    client_id = client_id or get_settings().google_web_client_id
+    if not client_id:
+        raise DomainError("GOOGLE_NOT_CONFIGURED", "Google sign-in is not configured", 503)
+    try:
+        claims = google_id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+    except (ValueError, TransportError):
+        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401) from None
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject or len(subject) > 255:
+        raise DomainError("INVALID_GOOGLE_TOKEN", "Google sign-in failed", 401)
+    return claims
 
 
 def admin_login(db: Session, username: str, password: str, ip: str):

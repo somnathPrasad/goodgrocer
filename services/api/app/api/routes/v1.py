@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import admin, customer, get_db, owned, session_for
+from app.api.dependencies import admin, customer, get_db, optional_customer_id, owned, session_for
 from app.core.config import get_settings
 from app.core.errors import DomainError
 from app.models.domain import (
@@ -42,7 +42,7 @@ from app.schemas.domain import (
     VariantInput,
     VariantOut,
 )
-from app.services import auth, catalogue, orders
+from app.services import auth, catalogue, customer_deletion, orders
 from app.services.providers import image_storage, payment_provider
 
 router = APIRouter(prefix="/api/v1")
@@ -105,6 +105,20 @@ def logout(
     db.commit()
 
 
+@router.post("/account/deletion", status_code=204, tags=["auth"])
+def delete_account(
+    data: GoogleLoginInput,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    customer_deletion.delete_customer(
+        db,
+        data.id_token,
+        request.client.host,
+        optional_customer_id(request, db),
+    )
+
+
 @router.get("/addresses", response_model=list[AddressOut], tags=["customer"])
 def addresses(current: Customer = Depends(customer), db: Session = Depends(get_db)):
     return db.scalars(
@@ -137,11 +151,15 @@ def reverse_geocode(
         response.raise_for_status()
         payload = response.json()
     except (httpx.HTTPError, ValueError) as exc:
-        raise DomainError("ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502) from exc
+        raise DomainError(
+            "ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502
+        ) from exc
     if payload.get("status") == "ZERO_RESULTS":
         return {"line1": "", "locality": "", "city": "", "state": "", "postal_code": ""}
     if payload.get("status") != "OK" or not payload.get("results"):
-        raise DomainError("ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502)
+        raise DomainError(
+            "ADDRESS_LOOKUP_FAILED", "Address lookup failed. Enter the address manually.", 502
+        )
     components = payload["results"][0].get("address_components", [])
 
     def component(*types: str) -> str:

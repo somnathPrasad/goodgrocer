@@ -7,6 +7,7 @@ confirmed technical choices in `docs/ARCHITECTURE.md`.
 ## Repository ownership
 
 - `apps/android/` contains the native Android customer application.
+- `apps/public-web/` contains the public informational and account-support website.
 - `apps/admin-web/` contains the store-owner web portal.
 - `services/api/` contains the backend API and owns access to PostgreSQL.
 - `packages/api-contracts/` is reserved for shared API contract artifacts.

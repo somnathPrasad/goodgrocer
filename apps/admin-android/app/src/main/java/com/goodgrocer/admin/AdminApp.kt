@@ -234,13 +234,23 @@ private fun OrderRow(order: Order, open: () -> Unit) {
                 StatusBadge(order.status)
             }
             Text(money(order.total), style = MaterialTheme.typography.headlineMedium)
-            Text("${label(order.fulfilment_type)}  ·  ${order.customer_phone}", color = Muted, style = MaterialTheme.typography.bodyMedium)
+            Text("${label(order.fulfilment_type)}  ·  ${order.customer_phone ?: "Delivery details removed"}", color = Muted, style = MaterialTheme.typography.bodyMedium)
+            customerDeletionMessage(order)?.let { Text(it, color = Danger, style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider(color = Line)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${label(order.payment_method)}  ·  ${label(order.payment_status)}", style = MaterialTheme.typography.bodyMedium, color = Muted, modifier = Modifier.weight(1f))
                 Icon(Icons.Default.ChevronRight, contentDescription = "Open order", tint = Green)
             }
         }
+    }
+}
+
+private fun customerDeletionMessage(order: Order): String? {
+    if (order.customer_deleted_at == null) return null
+    return if (order.customer_phone == null) {
+        "Customer deleted · Delivery details removed"
+    } else {
+        "Customer deleted · Delivery details retained until ${order.delivery_details_erase_at?.take(10) ?: "order completion"}"
     }
 }
 
@@ -282,7 +292,8 @@ private fun OrderScreen(order: Order, busy: Boolean, error: String, vm: AdminVie
             Surface(shape = CardShape, color = Color.White, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) { StatusBadge(order.status); Spacer(Modifier.weight(1f)); Text(money(order.total), style = MaterialTheme.typography.titleLarge) }
-                    Text("${label(order.fulfilment_type)}  ·  ${order.customer_phone}", color = Muted)
+                    Text("${label(order.fulfilment_type)}  ·  ${order.customer_phone ?: "Delivery details removed"}", color = Muted)
+                    customerDeletionMessage(order)?.let { Text(it, color = Danger) }
                     Text("${label(order.payment_method)}  ·  ${label(order.payment_status)}", color = Muted)
                 }
             }

@@ -8,6 +8,9 @@ only through the backend; FastAPI alone owns PostgreSQL access.
 - Android: Kotlin, Jetpack Compose/Material 3, ViewModel, StateFlow/coroutines,
   Retrofit/OkHttp, Moshi and Coil. Navigation Compose organizes the screens.
 - Admin Android: Kotlin, Jetpack Compose/Material 3, ViewModel, Retrofit/Moshi.
+- Public web: an independent Next.js App Router application in `apps/public-web`
+  for informational pages, Play Store links, the privacy policy and the web
+  Customer-deletion path.
 - Retained admin web: Next.js App Router, TypeScript/React, semantic controls and custom CSS.
 - Backend: Python 3.12/uv, FastAPI/Pydantic v2, synchronous SQLAlchemy 2,
   psycopg 3, PostgreSQL 17 and explicit Alembic migrations.
@@ -42,7 +45,20 @@ Paid online cancellation awaits a refund integration.
 The first release rejects new pickup and non-COD checkout requests in the API;
 existing orders retain their recorded workflows.
 
+Customer deletion detaches orders from the deleted Customer and records the
+non-personal deletion and delivery-erasure deadlines on each retained order.
+Terminal orders lose delivery details immediately. Active orders lose them when
+they become terminal or reach 30 days after Customer deletion. Both owner clients
+display these states from explicit API fields rather than inferring them from
+missing values.
+
 ## Clients
+
+The public website is deployed separately from the store-owner portal. It has no
+catalogue, ordering or persistent customer-account surface and calls FastAPI only
+for account-support flows. The web deletion path holds a newly issued Google ID
+token only in browser memory, forwards it once through the Next.js server to
+FastAPI, and creates no customer cookie or web session.
 
 The Next.js server proxies `/api/v1/admin` to FastAPI; an HttpOnly SameSite=Strict
 cookie stays in the browser, and FastAPI checks Origin for writes. No browser

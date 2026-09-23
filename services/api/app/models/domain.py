@@ -161,7 +161,15 @@ class Order(Timestamp, Base):
     __table_args__ = (UniqueConstraint("customer_id", "idempotency_key"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     order_number: Mapped[str] = mapped_column(String(40), unique=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customers.id", ondelete="SET NULL"), index=True
+    )
+    customer_deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    delivery_details_erase_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
     idempotency_key: Mapped[str] = mapped_column(String(80))
     request_hash: Mapped[str] = mapped_column(String(64))
     fulfilment_type: Mapped[str] = mapped_column(String(20))
@@ -173,7 +181,7 @@ class Order(Timestamp, Base):
     discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     address_snapshot: Mapped[dict | None] = mapped_column(JSON)
-    customer_phone: Mapped[str] = mapped_column(String(20))
+    customer_phone: Mapped[str | None] = mapped_column(String(20))
     cancellation_reason: Mapped[str | None] = mapped_column(String(500))
     items: Mapped[list["OrderItem"]] = relationship(lazy="selectin")
     payment_attempts: Mapped[list["PaymentAttempt"]] = relationship(lazy="selectin")

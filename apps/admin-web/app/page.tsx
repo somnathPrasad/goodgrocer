@@ -401,7 +401,16 @@ export default function StoreDesk() {
                 <strong>{o.order_number}</strong>
                 <small>{new Date(o.created_at).toLocaleString("en-IN")}</small>
               </td>
-              <td>{o.customer_phone}</td>
+              <td>
+                {o.customer_phone || "Delivery details removed"}
+                {o.customer_deleted_at && (
+                  <small>
+                    {o.customer_phone
+                      ? `Customer deleted · retained until ${new Date(o.delivery_details_erase_at!).toLocaleDateString("en-IN")}`
+                      : "Customer deleted · delivery details removed"}
+                  </small>
+                )}
+              </td>
               <td>{o.fulfilment_type}</td>
               <td>
                 <Badge value={o.status} />
@@ -1301,8 +1310,16 @@ export default function StoreDesk() {
           <div className="order-summary">
             <Badge value={orderEdit.status} />
             <p>
-              {orderEdit.customer_phone} · {orderEdit.fulfilment_type}
+              {orderEdit.customer_phone || "Delivery details removed"} ·{" "}
+              {orderEdit.fulfilment_type}
             </p>
+            {orderEdit.customer_deleted_at && (
+              <p className="error">
+                {orderEdit.customer_phone
+                  ? `Customer deleted. Delivery details retained until ${new Date(orderEdit.delivery_details_erase_at!).toLocaleDateString("en-IN")}.`
+                  : "Customer deleted. Delivery details removed."}
+              </p>
+            )}
             <p>
               {orderEdit.payment_method.replaceAll("_", " ")} ·{" "}
               <strong>{orderEdit.payment_status}</strong>

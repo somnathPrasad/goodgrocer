@@ -3,7 +3,7 @@
 ## V1 scope
 
 One physical Kirana store, approximately 500 products, a native Android customer
-app, a native Android owner app and the retained store-owner web portal share one backend. The
+app, a native Android owner app, a public informational website and the retained store-owner web portal share one backend. The
 customer Android app opens with Google sign-in. After sign-in, customers can browse,
 search and use a persistent local cart. Google sign-in also authenticates checkout,
 saved addresses, account favourites and orders. A contact phone is collected from the
@@ -68,3 +68,20 @@ coupons/promotions/combos, reviews/chat, drivers/tracking, staff roles/RBAC,
 loyalty, order notifications, or distributed infrastructure. Future native iOS
 and multi-store design remain future considerations; no store_id is added now.
 Google OAuth client configuration, online UPI, deployment and backups require operator configuration.
+
+The public website provides Goodgrocer information, Play Store links and a web
+path for Customer deletion. Its initial home page introduces the Android app,
+explains browsing, cart, delivery and cash-on-delivery ordering, describes saved
+addresses, favourites and order tracking, and states that the owner confirms
+delivery serviceability manually. It does not provide catalogue browsing or
+ordering and does not advertise later-release checkout options. The website also
+publishes the product privacy policy, which is linked from the Android app.
+
+Customer deletion removes authentication, sessions, saved addresses, favourites
+and reusable personal data without cancelling orders. Terminal orders have their
+delivery details erased immediately. Active orders retain delivery details only
+until delivery, cancellation or 30 days after deletion, whichever happens first;
+their remaining non-personal commercial record stays available to the owner.
+Because the first release accepts cash on delivery only, Customer deletion also
+removes any unexpected payment-attempt records. Online payment retention and
+provider-side deletion must be decided before production online payments are enabled.

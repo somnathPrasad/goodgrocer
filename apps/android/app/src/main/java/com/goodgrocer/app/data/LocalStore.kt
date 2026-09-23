@@ -24,6 +24,9 @@ class LocalStore(context: Context, moshi: Moshi) {
     fun saveCart(lines: List<CartLine>) {
         prefs.edit().putString("cart", cartAdapter.toJson(lines)).apply()
     }
+    fun clearAll() {
+        prefs.edit().clear().apply()
+    }
     fun requestKey(): String = prefs.getString("request_key", null) ?: newRequestKey()
     fun newRequestKey(): String = java.util.UUID.randomUUID().toString().also {
         prefs.edit().putString("request_key", it).apply()

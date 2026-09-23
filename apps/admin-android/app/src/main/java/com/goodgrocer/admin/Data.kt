@@ -38,7 +38,7 @@ data class Product(val id: Int, val name: String, val slug: String, val descript
 data class ProductInput(val name: String, val slug: String, val description: String, val image_url: String?, val active: Boolean, val available: Boolean, val brand_id: Int, val category_ids: List<Int>)
 data class ProductPage(val items: List<Product>, val total: Int, val page: Int, val page_size: Int)
 data class OrderItem(val product_name: String, val variant_name: String, val quantity: Int, val line_total: String)
-data class Order(val id: Int, val order_number: String, val customer_phone: String, val fulfilment_type: String, val status: String, val payment_method: String, val payment_status: String, val total: String, val created_at: String, val address_snapshot: Map<String, Any?>?, val cancellation_reason: String?, val items: List<OrderItem>)
+data class Order(val id: Int, val order_number: String, val customer_phone: String?, val customer_deleted_at: String?, val delivery_details_erase_at: String?, val fulfilment_type: String, val status: String, val payment_method: String, val payment_status: String, val total: String, val created_at: String, val address_snapshot: Map<String, Any?>?, val cancellation_reason: String?, val items: List<OrderItem>)
 data class Dashboard(val awaiting_action: Int, val today_orders: Int, val unavailable_products: Int, val recent_orders: List<Order>)
 data class StatusInput(val status: String, val reason: String? = null)
 data class ImageResult(val image_url: String)
