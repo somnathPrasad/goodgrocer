@@ -9,6 +9,13 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.domain import Admin, Brand, Category, Product, ProductVariant
+from app.seed_data import (
+    BRANDS,
+    CATEGORIES,
+    LEGACY_SEED_BRANDS,
+    LEGACY_SEED_CATEGORIES,
+    PRODUCTS,
+)
 from app.services.auth import password_hasher
 
 
@@ -16,16 +23,48 @@ def seed_images(db):
     assets = Path(__file__).resolve().parents[1] / "seed-assets"
     media = get_settings().media_dir
     media.mkdir(parents=True, exist_ok=True)
-    for slug in ("tomatoes", "bananas"):
-        product = db.scalar(
-            select(Product).join(Brand).where(Product.slug == slug, Brand.slug == "town-harvest")
-        )
-        if product and not product.image_url:
-            shutil.copyfile(assets / f"{slug}.jpg", media / f"demo-{slug}.jpg")
-            product.image_url = f"/media/demo-{slug}.jpg"
-    category = db.scalar(select(Category).where(Category.slug == "fresh-produce"))
-    if category and not category.image_url and (media / "demo-tomatoes.jpg").exists():
-        category.image_url = "/media/demo-tomatoes.jpg"
+    image_products = {
+        "tomatoes.jpg": ("tomatoes",),
+        "bananas.jpg": ("bananas",),
+        "potatoes.jpg": ("potatoes",),
+        "onions.jpg": ("onions",),
+        "fresh-milk.jpg": ("fresh-milk",),
+        "sona-masoori-rice.jpg": ("sona-masoori-rice",),
+        "whole-wheat-atta.jpg": ("whole-wheat-atta",),
+        "toor-dal.jpg": ("toor-dal",),
+        "sunflower-oil.jpg": ("sunflower-oil",),
+        "spices.jpg": (
+            "everest-turmeric-powder",
+            "everest-red-chilli-powder",
+            "everest-coriander-powder",
+        ),
+        "tea.jpg": ("tea",),
+    }
+    media_urls = {}
+    for filename, product_slugs in image_products.items():
+        target = media / f"demo-{filename}"
+        if not target.exists():
+            shutil.copyfile(assets / filename, target)
+        media_url = f"/media/{target.name}"
+        media_urls[filename] = media_url
+        for slug in product_slugs:
+            product = db.scalar(select(Product).where(Product.slug == slug))
+            if product and not product.image_url:
+                product.image_url = media_url
+
+    category_images = {
+        "fresh-produce": "tomatoes.jpg",
+        "dairy-breakfast": "fresh-milk.jpg",
+        "rice-grains": "sona-masoori-rice.jpg",
+        "dals-pulses": "toor-dal.jpg",
+        "oil-ghee": "sunflower-oil.jpg",
+        "masala-essentials": "spices.jpg",
+        "tea-beverages": "tea.jpg",
+    }
+    for slug, filename in category_images.items():
+        category = db.scalar(select(Category).where(Category.slug == slug))
+        if category and not category.image_url:
+            category.image_url = media_urls[filename]
     db.commit()
 
 
@@ -33,90 +72,88 @@ def seed():
     if get_settings().environment == "production":
         raise SystemExit("Development seed is forbidden in production")
     with SessionLocal() as db:
-        if db.scalar(select(Product.id).limit(1)):
-            seed_images(db)
-            print("Catalogue already contains products; only missing demo photos were added.")
-            return
-        brands = [
-            Brand(name=n, slug=s)
-            for n, s in [
-                ("Town Harvest", "town-harvest"),
-                ("Daily Dairy", "daily-dairy"),
-                ("Pantry & Co", "pantry-co"),
-            ]
-        ]
-        categories = [
-            Category(name=n, slug=s, display_order=i)
-            for i, (n, s) in enumerate(
-                [
-                    ("Fresh produce", "fresh-produce"),
-                    ("Dairy & breakfast", "dairy-breakfast"),
-                    ("Rice & grains", "rice-grains"),
-                    ("Pantry essentials", "pantry-essentials"),
-                    ("Snacks & drinks", "snacks-drinks"),
-                ]
-            )
-        ]
-        db.add_all(brands + categories)
-        db.flush()
-        rows = [
-            ("Tomatoes", 0, [0], [("500 g", "30", "24"), ("1 kg", "60", "45")]),
-            ("Bananas", 0, [0, 1], [("Pack of 6", "50", "45")]),
-            ("Potatoes", 0, [0], [("1 kg", "40", "40")]),
-            ("Onions", 0, [0, 3], [("1 kg", "45", "39")]),
-            ("Fresh milk", 1, [1], [("500 ml", "30", "30"), ("1 L", "60", "58")]),
-            ("Natural curd", 1, [1], [("400 g", "45", "40")]),
-            ("Paneer", 1, [1], [("200 g", "100", "90")]),
-            (
-                "Basmati rice",
-                2,
-                [2, 3],
-                [("1 kg", "160", "145"), ("5 kg", "780", "700")],
-            ),
-            (
-                "Whole wheat atta",
-                2,
-                [2, 3],
-                [("1 kg", "60", "55"), ("5 kg", "290", "260")],
-            ),
-            ("Toor dal", 2, [2, 3], [("500 g", "90", "85"), ("1 kg", "180", "165")]),
-            ("Sunflower oil", 2, [3], [("1 L", "160", "145"), ("2 L", "320", "280")]),
-            ("Tea", 2, [1, 4], [("250 g", "150", "135")]),
-            ("Salt", 2, [3], [("1 kg", "28", "28")]),
-            (
-                "Roasted peanuts",
-                2,
-                [4],
-                [("Regular", "45", "40"), ("Family Pack", "100", "85")],
-            ),
-            ("Biscuits", 2, [1, 4], [("Pack of 6", "60", "55")]),
-            ("Mango juice", 2, [4], [("1 L", "110", "99")]),
-        ]
-        for i, (name, brand, cats, variants) in enumerate(rows):
-            product = Product(
-                name=name,
-                slug=name.lower().replace(" ", "-"),
-                brand_id=brands[brand].id,
-                description=f"{name} for your everyday kitchen. Selected by your neighbourhood store.",
-                categories=[categories[c] for c in cats],
-                available=i != 6,
-            )
-            db.add(product)
-            db.flush()
-            for j, (label, mrp, price) in enumerate(variants):
-                db.add(
-                    ProductVariant(
-                        product_id=product.id,
-                        name=label,
-                        mrp=mrp,
-                        selling_price=price,
-                        display_order=j,
-                        available=not (i == 7 and j == 1),
-                    )
-                )
-        db.commit()
+        counts = seed_catalogue(db)
         seed_images(db)
-        print("Seeded 3 brands, 5 categories and 16 products. Demo data only.")
+        print(
+            "Seeded or refreshed "
+            f"{counts['brands']} brands, {counts['categories']} categories, "
+            f"{counts['products']} products and {counts['variants']} variants. "
+            "Representative development data only; prices are not live."
+        )
+
+
+def seed_catalogue(db):
+    """Upsert only known seed records, preserving unrelated local catalogue data."""
+    brands = {brand.slug: brand for brand in db.scalars(select(Brand)).all()}
+    for name, slug in BRANDS:
+        brand = brands.get(slug)
+        if brand is None:
+            brand = Brand(slug=slug)
+            brands[slug] = brand
+            db.add(brand)
+        brand.name = name
+        brand.active = True
+    for slug in LEGACY_SEED_BRANDS:
+        if brand := brands.get(slug):
+            brand.active = False
+
+    categories = {category.slug: category for category in db.scalars(select(Category)).all()}
+    for display_order, (name, slug) in enumerate(CATEGORIES):
+        category = categories.get(slug)
+        if category is None:
+            category = Category(slug=slug)
+            categories[slug] = category
+            db.add(category)
+        category.name = name
+        category.display_order = display_order
+        category.active = True
+    for slug in LEGACY_SEED_CATEGORIES:
+        if category := categories.get(slug):
+            category.active = False
+    db.flush()
+
+    products = {product.slug: product for product in db.scalars(select(Product)).all()}
+    variant_count = 0
+    for row in PRODUCTS:
+        product = products.get(row.slug)
+        if product is None:
+            product = Product(slug=row.slug)
+            products[row.slug] = product
+            db.add(product)
+        product.name = row.name
+        product.brand_id = brands[row.brand].id
+        product.description = row.description
+        product.categories = [categories[slug] for slug in row.categories]
+        product.active = True
+        product.available = row.available
+        db.flush()
+
+        existing = {variant.name: variant for variant in product.variants}
+        current_names = {variant.name for variant in row.variants}
+        for old_name, old_variant in existing.items():
+            if old_name not in current_names:
+                # Keep rows that old demo orders may reference, but hide them.
+                old_variant.active = False
+                old_variant.available = False
+        for display_order, row_variant in enumerate(row.variants):
+            variant = existing.get(row_variant.name)
+            if variant is None:
+                variant = ProductVariant(product_id=product.id, name=row_variant.name)
+                db.add(variant)
+            variant.mrp = row_variant.mrp
+            variant.selling_price = row_variant.selling_price
+            variant.display_order = display_order
+            variant.active = True
+            variant.available = row_variant.available
+            variant_count += 1
+
+    db.commit()
+    return {
+        "brands": len(BRANDS),
+        "categories": len(CATEGORIES),
+        "products": len(PRODUCTS),
+        "variants": variant_count,
+    }
 
 
 def bootstrap():

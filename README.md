@@ -58,11 +58,15 @@ cp apps/public-web/.env.example apps/public-web/.env.local
 
 Bootstrap prompts for a username and a confirmed password of at least 12
 characters. It stores only an Argon2 hash; no default admin credentials exist.
-Seed inserts 16 development products, three brands and five categories, including
-multi-category products, flexible variants, discounts and unavailable examples.
-It skips existing products, fills missing photos only for the matching demo produce,
-and refuses production mode. Two public-domain produce photos are included; see
-`services/api/seed-assets/README.md` for attribution. Upload further images from
+Seed upserts a researched development catalogue of 104 products, 45 brands,
+14 categories and 187 variants, including common small and family pack sizes,
+multi-category products, discounts and unavailable examples. It refreshes known
+seed rows without deleting unrelated owner-created catalogue data, fills missing
+photos for matching demo produce, and refuses production mode. Prices are
+representative test values rather than a live local price feed. See
+`docs/SEED_CATALOGUE.md` for scope and research sources. Two public-domain
+produce photos and nine original generated catalogue photos are included; see
+`services/api/seed-assets/README.md` for provenance. Upload further images from
 the admin portal; missing images have placeholders.
 Neither seeding nor migrations run automatically at application startup.
 
