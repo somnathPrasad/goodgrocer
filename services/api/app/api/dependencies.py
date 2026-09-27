@@ -9,12 +9,17 @@ from app.services.auth import aware, digest
 
 
 def get_db():
+    """Own the transaction for one complete API request."""
     with SessionLocal() as db:
         try:
             yield db
+            db.commit()
         except Exception:
             db.rollback()
             raise
+
+
+TRANSACTIONAL_DB = Depends(get_db, scope="function")
 
 
 def session_for(request: Request, db: Session, admin: bool):
@@ -40,7 +45,7 @@ def session_for(request: Request, db: Session, admin: bool):
     return session
 
 
-def customer(request: Request, db: Session = Depends(get_db)) -> Customer:
+def customer(request: Request, db: Session = TRANSACTIONAL_DB) -> Customer:
     return db.get(Customer, session_for(request, db, False).customer_id)
 
 
@@ -53,7 +58,7 @@ def optional_customer_id(request: Request, db: Session) -> int | None:
     return session.customer_id
 
 
-def admin(request: Request, db: Session = Depends(get_db)) -> Admin:
+def admin(request: Request, db: Session = TRANSACTIONAL_DB) -> Admin:
     return db.get(Admin, session_for(request, db, True).admin_id)
 
 

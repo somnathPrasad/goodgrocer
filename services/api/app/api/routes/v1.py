@@ -7,7 +7,14 @@ from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import admin, customer, get_db, optional_customer_id, owned, session_for
+from app.api.dependencies import (
+    TRANSACTIONAL_DB,
+    admin,
+    customer,
+    optional_customer_id,
+    owned,
+    session_for,
+)
 from app.core.config import get_settings
 from app.core.errors import DomainError
 from app.models.domain import (
@@ -59,12 +66,12 @@ def config():
 
 
 @router.get("/brands", response_model=list[BrandOut], tags=["catalogue"])
-def brands(db: Session = Depends(get_db)):
+def brands(db: Session = TRANSACTIONAL_DB):
     return db.scalars(select(Brand).where(Brand.active.is_(True)).order_by(Brand.name)).all()
 
 
 @router.get("/categories", response_model=list[CategoryOut], tags=["catalogue"])
-def categories(db: Session = Depends(get_db)):
+def categories(db: Session = TRANSACTIONAL_DB):
     return db.scalars(
         select(Category)
         .where(Category.active.is_(True))
@@ -79,18 +86,18 @@ def products(
     q: str | None = Query(None, max_length=200),
     category_id: int | None = None,
     available: bool | None = None,
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return catalogue.list_products(db, page, page_size, q, category_id, available)
 
 
 @router.get("/products/{product_id}", response_model=ProductOut, tags=["catalogue"])
-def product(product_id: int, db: Session = Depends(get_db)):
+def product(product_id: int, db: Session = TRANSACTIONAL_DB):
     return catalogue.product_out(catalogue.get_product(db, product_id))
 
 
 @router.post("/auth/google", response_model=TokenResponse, tags=["auth"])
-def google_login(data: GoogleLoginInput, request: Request, db: Session = Depends(get_db)):
+def google_login(data: GoogleLoginInput, request: Request, db: Session = TRANSACTIONAL_DB):
     return auth.google_login(db, data.id_token, request.client.host)
 
 
@@ -98,17 +105,17 @@ def google_login(data: GoogleLoginInput, request: Request, db: Session = Depends
 def logout(
     request: Request,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     db.delete(session_for(request, db, False))
-    db.commit()
+    db.flush()
 
 
 @router.post("/account/deletion", status_code=204, tags=["auth"])
 def delete_account(
     data: GoogleLoginInput,
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     customer_deletion.delete_customer(
         db,
@@ -119,7 +126,7 @@ def delete_account(
 
 
 @router.get("/addresses", response_model=list[AddressOut], tags=["customer"])
-def addresses(current: Customer = Depends(customer), db: Session = Depends(get_db)):
+def addresses(current: Customer = Depends(customer), db: Session = TRANSACTIONAL_DB):
     return db.scalars(
         select(Address).where(Address.customer_id == current.id).order_by(Address.id)
     ).all()
@@ -130,7 +137,7 @@ def reverse_geocode(
     latitude: Decimal = Query(ge=-90, le=90),
     longitude: Decimal = Query(ge=-180, le=180),
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return address_suggestion.suggest_address(db, current.id, latitude, longitude)
 
@@ -139,11 +146,11 @@ def reverse_geocode(
 def create_address(
     data: AddressInput,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     row = Address(customer_id=current.id, **data.model_dump())
     db.add(row)
-    db.commit()
+    db.flush()
     return row
 
 
@@ -152,12 +159,12 @@ def edit_address(
     address_id: int,
     data: AddressInput,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     row = owned(db, Address, address_id, current.id)
     for key, value in data.model_dump().items():
         setattr(row, key, value)
-    db.commit()
+    db.flush()
     return row
 
 
@@ -165,14 +172,14 @@ def edit_address(
 def delete_address(
     address_id: int,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     db.delete(owned(db, Address, address_id, current.id))
-    db.commit()
+    db.flush()
 
 
 @router.get("/favourites", response_model=list[ProductOut], tags=["customer"])
-def favourites(current: Customer = Depends(customer), db: Session = Depends(get_db)):
+def favourites(current: Customer = Depends(customer), db: Session = TRANSACTIONAL_DB):
     rows = db.scalars(
         select(Product)
         .join(Favourite)
@@ -186,32 +193,32 @@ def favourites(current: Customer = Depends(customer), db: Session = Depends(get_
 def favourite(
     product_id: int,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     catalogue.get_product(db, product_id)
     db.scalar(select(Customer).where(Customer.id == current.id).with_for_update())
     if not db.get(Favourite, (current.id, product_id)):
         db.add(Favourite(customer_id=current.id, product_id=product_id))
-    db.commit()
+    db.flush()
 
 
 @router.delete("/favourites/{product_id}", status_code=204, tags=["customer"])
 def unfavourite(
     product_id: int,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     row = db.get(Favourite, (current.id, product_id))
     if row:
         db.delete(row)
-        db.commit()
+        db.flush()
 
 
 @router.post("/checkout/quote", response_model=QuoteOut, tags=["orders"])
 def quote(
     data: CheckoutInput,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.quote(db, current, data)
 
@@ -220,7 +227,7 @@ def quote(
 def place_order(
     data: OrderInput,
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.place_order(db, current, data)
 
@@ -229,20 +236,26 @@ def place_order(
 def order_list(
     page: int = Query(1, ge=1),
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.list_for_customer(db, current.id, page)
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut, tags=["orders"])
 def order_detail(
-    order_id: int, current: Customer = Depends(customer), db: Session = Depends(get_db)
+    order_id: int,
+    current: Customer = Depends(customer),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.get_for_customer(db, current.id, order_id)
 
 
 @router.post("/orders/{order_id}/reorder", response_model=ReorderOut, tags=["orders"])
-def reorder(order_id: int, current: Customer = Depends(customer), db: Session = Depends(get_db)):
+def reorder(
+    order_id: int,
+    current: Customer = Depends(customer),
+    db: Session = TRANSACTIONAL_DB,
+):
     return orders.reorder(db, current.id, order_id)
 
 
@@ -251,7 +264,7 @@ def dev_payment(
     order_id: int,
     outcome: Literal["PAID", "FAILED"],
     current: Customer = Depends(customer),
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.complete_development_payment(db, current.id, order_id, outcome)
 
@@ -261,7 +274,7 @@ def admin_login(
     data: LoginInput,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     if request.headers.get("origin") != get_settings().admin_origin:
         raise DomainError("FORBIDDEN", "Untrusted request origin", 403)
@@ -279,7 +292,7 @@ def admin_login(
 
 
 @router.post("/admin/auth/mobile-login", response_model=TokenResponse, tags=["admin-auth"])
-def admin_mobile_login(data: LoginInput, request: Request, db: Session = Depends(get_db)):
+def admin_mobile_login(data: LoginInput, request: Request, db: Session = TRANSACTIONAL_DB):
     # Native clients have no Origin. Reject browser-originated requests here.
     if request.headers.get("origin"):
         raise DomainError("FORBIDDEN", "Use the browser sign-in endpoint", 403)
@@ -287,9 +300,9 @@ def admin_mobile_login(data: LoginInput, request: Request, db: Session = Depends
 
 
 @owner.post("/auth/logout", status_code=204)
-def admin_logout(request: Request, response: Response, db: Session = Depends(get_db)):
+def admin_logout(request: Request, response: Response, db: Session = TRANSACTIONAL_DB):
     db.delete(session_for(request, db, True))
-    db.commit()
+    db.flush()
     response.delete_cookie("gg_admin", path="/api/v1/admin")
 
 
@@ -299,7 +312,7 @@ def admin_me():
 
 
 @owner.get("/dashboard")
-def dashboard(db: Session = Depends(get_db)):
+def dashboard(db: Session = TRANSACTIONAL_DB):
     today = datetime.combine(
         datetime.now(ZoneInfo("Asia/Kolkata")).date(),
         time.min,
@@ -325,50 +338,50 @@ def dashboard(db: Session = Depends(get_db)):
 
 
 @owner.get("/brands", response_model=list[BrandOut])
-def admin_brands(db: Session = Depends(get_db)):
+def admin_brands(db: Session = TRANSACTIONAL_DB):
     return db.scalars(select(Brand).order_by(Brand.name)).all()
 
 
 @owner.post("/brands", response_model=BrandOut, status_code=201)
-def create_brand(data: BrandInput, db: Session = Depends(get_db)):
+def create_brand(data: BrandInput, db: Session = TRANSACTIONAL_DB):
     row = Brand(**data.model_dump())
     db.add(row)
-    db.commit()
+    db.flush()
     return row
 
 
 @owner.put("/brands/{brand_id}", response_model=BrandOut)
-def edit_brand(brand_id: int, data: BrandInput, db: Session = Depends(get_db)):
+def edit_brand(brand_id: int, data: BrandInput, db: Session = TRANSACTIONAL_DB):
     row = db.get(Brand, brand_id)
     if row is None:
         raise DomainError("NOT_FOUND", "Brand not found", 404)
     for key, value in data.model_dump().items():
         setattr(row, key, value)
-    db.commit()
+    db.flush()
     return row
 
 
 @owner.get("/categories", response_model=list[CategoryOut])
-def admin_categories(db: Session = Depends(get_db)):
+def admin_categories(db: Session = TRANSACTIONAL_DB):
     return db.scalars(select(Category).order_by(Category.display_order, Category.id)).all()
 
 
 @owner.post("/categories", response_model=CategoryOut, status_code=201)
-def create_category(data: CategoryInput, db: Session = Depends(get_db)):
+def create_category(data: CategoryInput, db: Session = TRANSACTIONAL_DB):
     row = Category(**data.model_dump())
     db.add(row)
-    db.commit()
+    db.flush()
     return row
 
 
 @owner.put("/categories/{category_id}", response_model=CategoryOut)
-def edit_category(category_id: int, data: CategoryInput, db: Session = Depends(get_db)):
+def edit_category(category_id: int, data: CategoryInput, db: Session = TRANSACTIONAL_DB):
     row = db.get(Category, category_id)
     if row is None:
         raise DomainError("NOT_FOUND", "Category not found", 404)
     for key, value in data.model_dump().items():
         setattr(row, key, value)
-    db.commit()
+    db.flush()
     return row
 
 
@@ -381,7 +394,7 @@ def admin_products(
     brand_id: int | None = None,
     available: bool | None = None,
     active: bool | None = None,
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return catalogue.list_products(
         db, page, page_size, q, category_id, available, active, True, brand_id
@@ -389,28 +402,31 @@ def admin_products(
 
 
 @owner.get("/products/{product_id}", response_model=ProductOut)
-def admin_product(product_id: int, db: Session = Depends(get_db)):
+def admin_product(product_id: int, db: Session = TRANSACTIONAL_DB):
     return catalogue.product_out(catalogue.get_product(db, product_id, True), True)
 
 
 @owner.post("/products", response_model=ProductOut, status_code=201)
-def create_product(data: ProductInput, db: Session = Depends(get_db)):
+def create_product(data: ProductInput, db: Session = TRANSACTIONAL_DB):
     return catalogue.save_product(db, data)
 
 
 @owner.put("/products/{product_id}", response_model=ProductOut)
-def edit_product(product_id: int, data: ProductInput, db: Session = Depends(get_db)):
+def edit_product(product_id: int, data: ProductInput, db: Session = TRANSACTIONAL_DB):
     return catalogue.save_product(db, data, product_id)
 
 
 @owner.post("/products/{product_id}/variants", response_model=VariantOut, status_code=201)
-def create_variant(product_id: int, data: VariantInput, db: Session = Depends(get_db)):
+def create_variant(product_id: int, data: VariantInput, db: Session = TRANSACTIONAL_DB):
     return catalogue.save_variant(db, product_id, data)
 
 
 @owner.put("/products/{product_id}/variants/{variant_id}", response_model=VariantOut)
 def edit_variant(
-    product_id: int, variant_id: int, data: VariantInput, db: Session = Depends(get_db)
+    product_id: int,
+    variant_id: int,
+    data: VariantInput,
+    db: Session = TRANSACTIONAL_DB,
 ):
     return catalogue.save_variant(db, product_id, data, variant_id)
 
@@ -427,23 +443,23 @@ def admin_orders(
     page: int = Query(1, ge=1),
     status: Literal["PLACED", "ACCEPTED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"]
     | None = None,
-    db: Session = Depends(get_db),
+    db: Session = TRANSACTIONAL_DB,
 ):
     return orders.list_for_owner(db, page, status)
 
 
 @owner.get("/orders/{order_id}", response_model=OrderOut)
-def admin_order(order_id: int, db: Session = Depends(get_db)):
+def admin_order(order_id: int, db: Session = TRANSACTIONAL_DB):
     return orders.get_for_owner(db, order_id)
 
 
 @owner.post("/orders/{order_id}/status", response_model=OrderOut)
-def change_status(order_id: int, data: TransitionInput, db: Session = Depends(get_db)):
+def change_status(order_id: int, data: TransitionInput, db: Session = TRANSACTIONAL_DB):
     return orders.transition(db, order_id, data)
 
 
 @owner.post("/orders/{order_id}/mark-paid", response_model=OrderOut)
-def mark_paid(order_id: int, db: Session = Depends(get_db)):
+def mark_paid(order_id: int, db: Session = TRANSACTIONAL_DB):
     return orders.mark_cash_received(db, order_id)
 
 

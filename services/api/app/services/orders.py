@@ -201,7 +201,7 @@ def place_order(db, customer, data):
                 amount=order.total,
             )
         )
-    db.commit()
+    db.flush()
     db.refresh(order)
     return order
 
@@ -247,7 +247,7 @@ def transition(db, order_id, data):
         from app.services.customer_deletion import erase_delivery_details
 
         erase_delivery_details(order)
-    db.commit()
+    db.flush()
     return order
 
 
@@ -301,7 +301,7 @@ def complete_development_payment(db, customer_id, order_id, outcome: Literal["PA
     if attempt.provider != "development":
         raise DomainError("INVALID_PAYMENT", "Not a development payment", 409)
     order.payment_status = attempt.status = outcome
-    db.commit()
+    db.flush()
     return order
 
 
@@ -312,7 +312,7 @@ def mark_cash_received(db, order_id):
     if order.payment_method == "ONLINE_UPI" or order.status == "CANCELLED":
         raise DomainError("INVALID_PAYMENT", "Cannot mark this order paid manually", 409)
     order.payment_status = "PAID"
-    db.commit()
+    db.flush()
     return order
 
 

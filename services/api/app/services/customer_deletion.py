@@ -53,7 +53,7 @@ def delete_customer(
     )
     if customer is None:
         db.execute(delete(RateLimit).where(RateLimit.key == subject_rate_key))
-        db.commit()
+        db.flush()
         return
 
     deleted_at = now()
@@ -79,7 +79,7 @@ def delete_customer(
     db.execute(delete(Favourite).where(Favourite.customer_id == customer.id))
     db.execute(delete(RateLimit).where(RateLimit.key == subject_rate_key))
     db.delete(customer)
-    db.commit()
+    db.flush()
 
 
 def erase_expired_delivery_details(db: Session, as_of=None) -> int:
@@ -96,5 +96,5 @@ def erase_expired_delivery_details(db: Session, as_of=None) -> int:
     ).all()
     for order in rows:
         erase_delivery_details(order, order.delivery_details_erase_at)
-    db.commit()
+    db.flush()
     return len(rows)

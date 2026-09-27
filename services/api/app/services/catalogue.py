@@ -80,7 +80,7 @@ def save_product(db, data, product_id=None):
         setattr(product, key, value)
     product.categories = list(categories)
     db.add(product)
-    db.commit()
+    db.flush()
     db.refresh(product)
     return product_out(product, True)
 
@@ -95,5 +95,5 @@ def save_variant(db, product_id, data, variant_id=None):
     for key, value in data.model_dump().items():
         setattr(variant, key, value)
     db.add(variant)
-    db.commit()
+    db.flush()
     return variant

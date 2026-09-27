@@ -65,7 +65,7 @@ def seed_images(db):
         category = db.scalar(select(Category).where(Category.slug == slug))
         if category and not category.image_url:
             category.image_url = media_urls[filename]
-    db.commit()
+    db.flush()
 
 
 def seed():
@@ -74,6 +74,7 @@ def seed():
     with SessionLocal() as db:
         counts = seed_catalogue(db)
         seed_images(db)
+        db.commit()
         print(
             "Seeded or refreshed "
             f"{counts['brands']} brands, {counts['categories']} categories, "
@@ -147,7 +148,7 @@ def seed_catalogue(db):
             variant.available = row_variant.available
             variant_count += 1
 
-    db.commit()
+    db.flush()
     return {
         "brands": len(BRANDS),
         "categories": len(CATEGORIES),
@@ -192,6 +193,7 @@ def main():
 
         with SessionLocal() as db:
             count = erase_expired_delivery_details(db)
+            db.commit()
         print(f"Erased delivery details from {count} retained order(s).")
     else:
         from app.main import app

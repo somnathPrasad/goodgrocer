@@ -37,7 +37,15 @@ def db():
 
 @pytest.fixture()
 def client(db):
-    app.dependency_overrides[get_db] = lambda: db
+    def request_transaction():
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    app.dependency_overrides[get_db] = request_transaction
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
@@ -73,6 +81,7 @@ def data(db):
     token = new_session(db, customer_id=customer.id)["token"]
     other_token = new_session(db, customer_id=other.id)["token"]
     admin_token = new_session(db, admin_id=admin.id)["token"]
+    db.commit()
     return {
         "product": product,
         "variant": variant,

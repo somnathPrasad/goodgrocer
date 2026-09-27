@@ -28,6 +28,7 @@ def aware(value):
 
 
 def rate_limit(db: Session, key: str, limit: int, seconds: int):
+    # Security accounting is intentionally durable before the protected workflow.
     # PostgreSQL upsert then row lock serializes attempts across workers.
     db.execute(
         insert(RateLimit)
@@ -55,7 +56,7 @@ def new_session(db: Session, customer_id=None, admin_id=None):
             expires_at=expiry,
         )
     )
-    db.commit()
+    db.flush()
     return {"token": token, "expires_at": expiry}
 
 
