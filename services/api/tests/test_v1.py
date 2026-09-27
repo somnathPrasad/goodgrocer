@@ -6,7 +6,6 @@ import pytest
 from PIL import Image
 from pydantic import ValidationError
 
-from app.api.routes import v1
 from app.core.config import Settings
 from app.models.domain import (
     Address,
@@ -18,6 +17,7 @@ from app.models.domain import (
     now,
 )
 from app.schemas.domain import ProductInput, VariantInput
+from app.services import address_suggestion
 from app.services.auth import new_session
 
 
@@ -186,40 +186,34 @@ def test_authentication_and_ownership_error_mapping(client, data):
     assert client.get(f"/api/v1/orders/{order['id']}", headers=data["headers"]).status_code == 200
 
 
-def test_reverse_geocode_suggests_fields_for_confirmed_pin(client, data, monkeypatch):
-    class GoogleResponse:
-        def raise_for_status(self):
-            pass
+def test_reverse_geocode_authenticates_validates_and_delegates(client, db, data, monkeypatch):
+    received = []
 
-        def json(self):
-            return {
-                "status": "OK",
-                "results": [
-                    {
-                        "address_components": [
-                            {"long_name": "Market Road", "types": ["route"]},
-                            {"long_name": "Indiranagar", "types": ["sublocality_level_1"]},
-                            {"long_name": "Bengaluru", "types": ["locality"]},
-                            {"long_name": "Karnataka", "types": ["administrative_area_level_1"]},
-                            {"long_name": "560038", "types": ["postal_code"]},
-                        ]
-                    }
-                ],
-            }
+    def suggest(db, customer_id, latitude, longitude):
+        received.append((db, customer_id, latitude, longitude))
+        return {
+            "line1": "Market Road",
+            "locality": "",
+            "city": "",
+            "state": "",
+            "postal_code": "",
+        }
 
-    monkeypatch.setattr(v1, "get_settings", lambda: Settings(google_geocoding_api_key="test-key"))
-    monkeypatch.setattr(v1.httpx, "get", lambda *args, **kwargs: GoogleResponse())
+    monkeypatch.setattr(address_suggestion, "suggest_address", suggest)
     path = "/api/v1/addresses/reverse-geocode?latitude=12.9&longitude=77.6"
     assert client.get(path).status_code == 401
     result = client.get(path, headers=data["headers"])
     assert result.status_code == 200, result.text
-    assert result.json() == {
-        "line1": "Market Road",
-        "locality": "Indiranagar",
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "postal_code": "560038",
-    }
+    assert result.json()["line1"] == "Market Road"
+    assert received == [(db, data["customer"].id, Decimal("12.9"), Decimal("77.6"))]
+    assert (
+        client.get(
+            "/api/v1/addresses/reverse-geocode?latitude=91&longitude=77.6",
+            headers=data["headers"],
+        ).status_code
+        == 422
+    )
+    assert len(received) == 1
 
 
 def test_favourites_are_unique_and_owned(client, data):
