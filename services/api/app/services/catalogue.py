@@ -13,6 +13,42 @@ def product_out(product, admin=False):
     return result
 
 
+def list_brands(db, admin=False):
+    query = select(Brand)
+    if not admin:
+        query = query.where(Brand.active.is_(True))
+    return db.scalars(query.order_by(Brand.name)).all()
+
+
+def save_brand(db, data, brand_id=None):
+    brand = db.get(Brand, brand_id) if brand_id else Brand()
+    if brand is None:
+        raise DomainError("NOT_FOUND", "Brand not found", 404)
+    for key, value in data.model_dump().items():
+        setattr(brand, key, value)
+    db.add(brand)
+    db.flush()
+    return brand
+
+
+def list_categories(db, admin=False):
+    query = select(Category)
+    if not admin:
+        query = query.where(Category.active.is_(True))
+    return db.scalars(query.order_by(Category.display_order, Category.id)).all()
+
+
+def save_category(db, data, category_id=None):
+    category = db.get(Category, category_id) if category_id else Category()
+    if category is None:
+        raise DomainError("NOT_FOUND", "Category not found", 404)
+    for key, value in data.model_dump().items():
+        setattr(category, key, value)
+    db.add(category)
+    db.flush()
+    return category
+
+
 def list_products(
     db,
     page=1,

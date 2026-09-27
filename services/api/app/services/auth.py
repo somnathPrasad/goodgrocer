@@ -60,6 +60,11 @@ def new_session(db: Session, customer_id=None, admin_id=None):
     return {"token": token, "expires_at": expiry}
 
 
+def logout(db: Session, session: AuthSession):
+    db.delete(session)
+    db.flush()
+
+
 def google_login(db: Session, token: str, ip: str):
     client_id = get_settings().google_web_client_id
     if not client_id:

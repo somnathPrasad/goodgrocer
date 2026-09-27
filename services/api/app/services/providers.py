@@ -142,3 +142,9 @@ def image_storage() -> ImageStorage:
             settings.supabase_storage_bucket,
         )
     return LocalImageStorage(settings.media_dir)
+
+
+def store_catalogue_image(content_type: str | None, content: bytes) -> str:
+    if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise DomainError("INVALID_IMAGE", "Upload JPEG, PNG or WebP")
+    return image_storage().save(content)

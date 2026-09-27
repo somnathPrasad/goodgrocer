@@ -60,10 +60,3 @@ def optional_customer_id(request: Request, db: Session) -> int | None:
 
 def admin(request: Request, db: Session = TRANSACTIONAL_DB) -> Admin:
     return db.get(Admin, session_for(request, db, True).admin_id)
-
-
-def owned(db, model, object_id, customer_id):
-    value = db.get(model, object_id)
-    if value is None or value.customer_id != customer_id:
-        raise DomainError("NOT_FOUND", "Resource not found", 404)
-    return value

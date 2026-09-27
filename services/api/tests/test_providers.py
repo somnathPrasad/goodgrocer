@@ -4,7 +4,9 @@ import httpx
 import pytest
 from PIL import Image
 
+from app.core.config import Settings
 from app.core.errors import DomainError
+from app.services import providers
 from app.services.providers import SupabaseImageStorage
 
 
@@ -61,3 +63,20 @@ def test_supabase_storage_hides_upstream_failures(status):
     assert error.value.code == "IMAGE_STORAGE_UNAVAILABLE"
     assert error.value.status == 503
     assert "private upstream detail" not in error.value.message
+
+
+def test_store_catalogue_image_validates_type_and_uses_configured_storage(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        providers,
+        "get_settings",
+        lambda: Settings(media_dir=tmp_path),
+    )
+
+    image_url = providers.store_catalogue_image("image/png", png())
+
+    assert image_url.startswith("/media/")
+    assert (tmp_path / image_url.removeprefix("/media/")).is_file()
+
+    with pytest.raises(DomainError) as error:
+        providers.store_catalogue_image("text/plain", b"not an image")
+    assert error.value.code == "INVALID_IMAGE"

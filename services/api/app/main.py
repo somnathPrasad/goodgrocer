@@ -10,7 +10,6 @@ from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException
 
 from app.api.router import api_router
-from app.api.routes.v1 import router
 from app.core.config import get_settings
 from app.core.errors import DomainError
 
@@ -27,7 +26,6 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(title="Goodgrocer API", version="1.0.0")
     application.include_router(api_router)
-    application.include_router(router)
     if settings.image_storage_provider == "local":
         settings.media_dir.mkdir(parents=True, exist_ok=True)
         application.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
