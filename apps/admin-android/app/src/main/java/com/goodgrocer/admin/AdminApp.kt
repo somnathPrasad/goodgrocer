@@ -1,5 +1,6 @@
 package com.goodgrocer.admin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -107,18 +108,28 @@ private fun AdminContent(s: AdminState, vm: AdminViewModel) {
     var addingBrand by remember { mutableStateOf(false) }
     var addingCategory by remember { mutableStateOf(false) }
     var addingProduct by remember { mutableStateOf(false) }
-    if (s.selectedOrder != null) { OrderScreen(s.selectedOrder!!, s.busy, s.error, vm); return }
+    if (s.selectedOrder != null) {
+        BackHandler { vm.closeOrder() }
+        OrderScreen(s.selectedOrder!!, s.busy, s.error, vm)
+        return
+    }
     if (s.selectedProduct != null || addingProduct) {
+        BackHandler { vm.closeProduct(); addingProduct = false }
         ProductEditor(s.selectedProduct, s, vm) { vm.closeProduct(); addingProduct = false }
         return
     }
     if (editBrand != null || addingBrand) {
+        BackHandler { editBrand = null; addingBrand = false }
         BrandEditor(editBrand, s.busy, s.error, vm) { editBrand = null; addingBrand = false }
         return
     }
     if (editCategory != null || addingCategory) {
+        BackHandler { editCategory = null; addingCategory = false }
         CategoryEditor(editCategory, s.busy, s.error, vm) { editCategory = null; addingCategory = false }
         return
+    }
+    if (s.section != "Dashboard") {
+        BackHandler { vm.section("Dashboard") }
     }
     Scaffold(
         containerColor = Paper,
