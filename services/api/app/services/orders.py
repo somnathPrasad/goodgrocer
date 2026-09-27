@@ -1,13 +1,13 @@
 import hashlib
 import json
 from decimal import Decimal
+from typing import Literal
 from uuid import uuid4
 
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.api.dependencies import owned
 from app.core.config import get_settings
 from app.core.errors import DomainError
 from app.models.domain import (
@@ -21,6 +21,13 @@ from app.models.domain import (
 from app.schemas.domain import AddressInput, CheckoutInput, ItemOut
 from app.services.catalogue import product_out
 from app.services.providers import payment_provider
+
+
+def _address_for_customer(db, address_id, customer_id):
+    address = db.get(Address, address_id)
+    if address is None or address.customer_id != customer_id:
+        raise DomainError("NOT_FOUND", "Resource not found", 404)
+    return address
 
 
 def canonical(value):
@@ -52,7 +59,7 @@ def resolve(db, customer, data, lock=False):
         payment_provider()
     snapshot = None
     if data.fulfilment_type == "DELIVERY":
-        address = owned(db, Address, data.address_id, customer.id)
+        address = _address_for_customer(db, data.address_id, customer.id)
         snapshot = AddressInput.model_validate(address).model_dump(mode="json")
     elif not (data.contact_phone or customer.phone_number):
         raise DomainError("CONTACT_PHONE_REQUIRED", "Enter a contact phone for pickup", 422)
@@ -244,7 +251,73 @@ def transition(db, order_id, data):
     return order
 
 
-def reorder(db, order):
+def list_for_customer(db, customer_id, page):
+    return db.scalars(
+        select(Order)
+        .where(Order.customer_id == customer_id)
+        .order_by(Order.id.desc())
+        .offset((page - 1) * 20)
+        .limit(20)
+    ).all()
+
+
+def get_for_customer(db, customer_id, order_id):
+    order = db.get(Order, order_id)
+    if order is None or order.customer_id != customer_id:
+        raise DomainError("NOT_FOUND", "Resource not found", 404)
+    return order
+
+
+def list_for_owner(db, page, status=None):
+    query = select(Order)
+    if status:
+        query = query.where(Order.status == status)
+    return db.scalars(query.order_by(Order.id.desc()).offset((page - 1) * 20).limit(20)).all()
+
+
+def get_for_owner(db, order_id):
+    order = db.get(Order, order_id)
+    if order is None:
+        raise DomainError("NOT_FOUND", "Order not found", 404)
+    return order
+
+
+def complete_development_payment(db, customer_id, order_id, outcome: Literal["PAID", "FAILED"]):
+    payment_provider()
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == order_id, Order.customer_id == customer_id)
+        .with_for_update()
+    )
+    if order is None:
+        raise DomainError("NOT_FOUND", "Order not found", 404)
+    if (
+        order.status != "PLACED"
+        or order.payment_method != "ONLINE_UPI"
+        or order.payment_status != "PENDING"
+    ):
+        raise DomainError("INVALID_PAYMENT", "This payment cannot be changed", 409)
+    attempt = order.payment_attempts[-1]
+    if attempt.provider != "development":
+        raise DomainError("INVALID_PAYMENT", "Not a development payment", 409)
+    order.payment_status = attempt.status = outcome
+    db.commit()
+    return order
+
+
+def mark_cash_received(db, order_id):
+    order = db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+    if order is None:
+        raise DomainError("NOT_FOUND", "Order not found", 404)
+    if order.payment_method == "ONLINE_UPI" or order.status == "CANCELLED":
+        raise DomainError("INVALID_PAYMENT", "Cannot mark this order paid manually", 409)
+    order.payment_status = "PAID"
+    db.commit()
+    return order
+
+
+def reorder(db, customer_id, order_id):
+    order = get_for_customer(db, customer_id, order_id)
     variants = {
         v.id: v
         for v in db.scalars(

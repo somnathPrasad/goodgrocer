@@ -43,7 +43,7 @@ from app.schemas.domain import (
     VariantOut,
 )
 from app.services import auth, catalogue, customer_deletion, orders
-from app.services.providers import image_storage, payment_provider
+from app.services.providers import image_storage
 
 router = APIRouter(prefix="/api/v1")
 owner = APIRouter(prefix="/admin", dependencies=[Depends(admin)], tags=["admin"])
@@ -274,25 +274,19 @@ def order_list(
     current: Customer = Depends(customer),
     db: Session = Depends(get_db),
 ):
-    return db.scalars(
-        select(Order)
-        .where(Order.customer_id == current.id)
-        .order_by(Order.id.desc())
-        .offset((page - 1) * 20)
-        .limit(20)
-    ).all()
+    return orders.list_for_customer(db, current.id, page)
 
 
 @router.get("/orders/{order_id}", response_model=OrderOut, tags=["orders"])
 def order_detail(
     order_id: int, current: Customer = Depends(customer), db: Session = Depends(get_db)
 ):
-    return owned(db, Order, order_id, current.id)
+    return orders.get_for_customer(db, current.id, order_id)
 
 
 @router.post("/orders/{order_id}/reorder", response_model=ReorderOut, tags=["orders"])
 def reorder(order_id: int, current: Customer = Depends(customer), db: Session = Depends(get_db)):
-    return orders.reorder(db, owned(db, Order, order_id, current.id))
+    return orders.reorder(db, current.id, order_id)
 
 
 @router.post("/orders/{order_id}/development-payment", response_model=OrderOut, tags=["payments"])
@@ -302,24 +296,7 @@ def dev_payment(
     current: Customer = Depends(customer),
     db: Session = Depends(get_db),
 ):
-    payment_provider()
-    row = db.scalar(
-        select(Order).where(Order.id == order_id, Order.customer_id == current.id).with_for_update()
-    )
-    if row is None:
-        raise DomainError("NOT_FOUND", "Order not found", 404)
-    if (
-        row.status != "PLACED"
-        or row.payment_method != "ONLINE_UPI"
-        or row.payment_status != "PENDING"
-    ):
-        raise DomainError("INVALID_PAYMENT", "This payment cannot be changed", 409)
-    attempt = row.payment_attempts[-1]
-    if attempt.provider != "development":
-        raise DomainError("INVALID_PAYMENT", "Not a development payment", 409)
-    row.payment_status = attempt.status = outcome
-    db.commit()
-    return row
+    return orders.complete_development_payment(db, current.id, order_id, outcome)
 
 
 @router.post("/admin/auth/login", tags=["admin-auth"])
@@ -495,18 +472,12 @@ def admin_orders(
     | None = None,
     db: Session = Depends(get_db),
 ):
-    query = select(Order)
-    if status:
-        query = query.where(Order.status == status)
-    return db.scalars(query.order_by(Order.id.desc()).offset((page - 1) * 20).limit(20)).all()
+    return orders.list_for_owner(db, page, status)
 
 
 @owner.get("/orders/{order_id}", response_model=OrderOut)
 def admin_order(order_id: int, db: Session = Depends(get_db)):
-    row = db.get(Order, order_id)
-    if row is None:
-        raise DomainError("NOT_FOUND", "Order not found", 404)
-    return row
+    return orders.get_for_owner(db, order_id)
 
 
 @owner.post("/orders/{order_id}/status", response_model=OrderOut)
@@ -516,14 +487,7 @@ def change_status(order_id: int, data: TransitionInput, db: Session = Depends(ge
 
 @owner.post("/orders/{order_id}/mark-paid", response_model=OrderOut)
 def mark_paid(order_id: int, db: Session = Depends(get_db)):
-    row = db.scalar(select(Order).where(Order.id == order_id).with_for_update())
-    if row is None:
-        raise DomainError("NOT_FOUND", "Order not found", 404)
-    if row.payment_method == "ONLINE_UPI" or row.status == "CANCELLED":
-        raise DomainError("INVALID_PAYMENT", "Cannot mark this order paid manually", 409)
-    row.payment_status = "PAID"
-    db.commit()
-    return row
+    return orders.mark_cash_received(db, order_id)
 
 
 router.include_router(owner)

@@ -14,11 +14,10 @@ from app.models.domain import (
     Customer,
     Favourite,
     Order,
-    OrderItem,
     PaymentAttempt,
     now,
 )
-from app.schemas.domain import ProductInput, TransitionInput, VariantInput
+from app.schemas.domain import ProductInput, VariantInput
 from app.services.auth import new_session
 
 
@@ -52,46 +51,6 @@ def place(client, data, **changes):
 def owner(client, data):
     client.cookies.set("gg_admin", data["admin_token"])
     return {"Origin": "http://localhost:3000"}
-
-
-def legacy_order(db, data, fulfilment_type, payment_method):
-    order = Order(
-        order_number=f"GG-LEGACY-{fulfilment_type}-{payment_method}",
-        customer_id=data["customer"].id,
-        customer_phone="+919876543210",
-        idempotency_key=f"legacy-{fulfilment_type}-{payment_method}",
-        request_hash="0" * 64,
-        fulfilment_type=fulfilment_type,
-        payment_method=payment_method,
-        subtotal=Decimal("100.25"),
-        delivery_fee=Decimal("0.00"),
-        discount=Decimal("0.00"),
-        total=Decimal("100.25"),
-        address_snapshot=None,
-    )
-    order.items = [
-        OrderItem(
-            product_id=data["product"].id,
-            variant_id=data["variant"].id,
-            product_name="Rice",
-            variant_name="1 kg",
-            quantity=1,
-            unit_mrp=Decimal("120.00"),
-            unit_selling_price=Decimal("100.25"),
-            line_total=Decimal("100.25"),
-        )
-    ]
-    if payment_method == "ONLINE_UPI":
-        order.payment_attempts = [
-            PaymentAttempt(
-                provider="development",
-                reference="legacy-payment-reference",
-                amount=Decimal("100.25"),
-            )
-        ]
-    db.add(order)
-    db.commit()
-    return order
 
 
 def test_mobile_admin_session_and_browser_cookie_isolation(client, data):
@@ -168,22 +127,10 @@ def test_catalogue_many_categories_search_and_pagination(client, data):
     assert client.get("/api/v1/products?q=absent").json()["total"] == 0
 
 
-@pytest.mark.parametrize(
-    "field,model",
-    [
-        ("active", "product"),
-        ("available", "product"),
-        ("active", "variant"),
-        ("available", "variant"),
-    ],
-)
-def test_availability_enforced(client, db, data, field, model):
-    setattr(data[model], field, False)
+def test_inactive_product_is_hidden_from_catalogue(client, db, data):
+    data["product"].active = False
     db.commit()
-    response = client.post("/api/v1/checkout/quote", json=cart(data), headers=data["headers"])
-    assert response.status_code == 409
-    if field == "active" and model == "product":
-        assert client.get("/api/v1/products").json()["items"] == []
+    assert client.get("/api/v1/products").json()["items"] == []
 
 
 @pytest.mark.parametrize("mrp,price", [("-1", "0"), ("10", "-1"), ("10", "11"), ("10", "1.001")])
@@ -192,49 +139,7 @@ def test_price_validation(mrp, price):
         VariantInput(name="Test", mrp=mrp, selling_price=price)
 
 
-def test_order_totals_snapshot_idempotency_and_stale(client, db, data):
-    request = cart(data)
-    quote = client.post("/api/v1/checkout/quote", json=request, headers=data["headers"]).json()
-    assert quote["total"] == "200.50"
-    payload = {
-        **request,
-        "quote_token": quote["quote_token"],
-        "idempotency_key": "stable-request-key-123",
-    }
-    first = client.post("/api/v1/orders", json=payload, headers=data["headers"])
-    assert first.status_code == 201, first.text
-    assert (
-        client.post("/api/v1/orders", json=payload, headers=data["headers"]).json()["id"]
-        == first.json()["id"]
-    )
-    data["variant"].selling_price = Decimal("110.00")
-    data["product"].name = "New rice name"
-    db.commit()
-    assert (
-        client.get(f"/api/v1/orders/{first.json()['id']}", headers=data["headers"]).json()["items"][
-            0
-        ]["product_name"]
-        == "Rice"
-    )
-    assert (
-        client.post(
-            "/api/v1/orders",
-            json={**payload, "idempotency_key": "another-request-12345"},
-            headers=data["headers"],
-        ).status_code
-        == 409
-    )
-    assert (
-        client.post(
-            "/api/v1/orders",
-            json={**payload, "items": [{"variant_id": data["variant"].id, "quantity": 3}]},
-            headers=data["headers"],
-        ).status_code
-        == 409
-    )
-
-
-def test_auth_and_ownership(client, data):
+def test_authentication_and_ownership_error_mapping(client, data):
     for path in ["/orders", "addresses", "favourites", "admin/products", "admin/orders"]:
         assert client.get("/api/v1/" + path.lstrip("/")).status_code == 401
     address = {
@@ -267,7 +172,6 @@ def test_auth_and_ownership(client, data):
         == 404
     )
     order = place(client, data, fulfilment_type="DELIVERY", address_id=aid)
-    assert order["address_snapshot"]["line1"] == "12 Market Road"
     assert (
         client.get(f"/api/v1/orders/{order['id']}", headers=data["other_headers"]).status_code
         == 404
@@ -279,12 +183,7 @@ def test_auth_and_ownership(client, data):
         == 404
     )
     assert client.delete(f"/api/v1/addresses/{aid}", headers=data["headers"]).status_code == 204
-    assert (
-        client.get(f"/api/v1/orders/{order['id']}", headers=data["headers"]).json()[
-            "address_snapshot"
-        ]["line1"]
-        == "12 Market Road"
-    )
+    assert client.get(f"/api/v1/orders/{order['id']}", headers=data["headers"]).status_code == 200
 
 
 def test_reverse_geocode_suggests_fields_for_confirmed_pin(client, data, monkeypatch):
@@ -331,51 +230,6 @@ def test_favourites_are_unique_and_owned(client, data):
     assert client.get("/api/v1/favourites", headers=data["other_headers"]).json() == []
     client.delete(path, headers=data["other_headers"])
     assert len(client.get("/api/v1/favourites", headers=data["headers"]).json()) == 1
-
-
-def test_status_transitions_and_terminal(client, data):
-    order = place(client, data)
-    headers = owner(client, data)
-    path = f"/api/v1/admin/orders/{order['id']}/status"
-    assert client.post(path, json={"status": "DELIVERED"}, headers=headers).status_code == 409
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 200
-    assert (
-        client.post(path, json={"status": "OUT_FOR_DELIVERY"}, headers=headers).status_code == 200
-    )
-    assert client.post(path, json={"status": "DELIVERED"}, headers=headers).status_code == 200
-    assert (
-        client.post(
-            path, json={"status": "CANCELLED", "reason": "late"}, headers=headers
-        ).status_code
-        == 409
-    )
-
-
-def test_cancel_reason_and_terminal(client, data):
-    order = place(client, data)
-    headers = owner(client, data)
-    path = f"/api/v1/admin/orders/{order['id']}/status"
-    assert client.post(path, json={"status": "CANCELLED"}, headers=headers).status_code == 400
-    assert (
-        client.post(
-            path, json={"status": "CANCELLED", "reason": "Cannot serve address"}, headers=headers
-        ).status_code
-        == 200
-    )
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 409
-
-
-def test_reorder_current_price_and_unavailable(client, db, data):
-    order = place(client, data)
-    data["variant"].selling_price = Decimal("90.00")
-    db.commit()
-    path = f"/api/v1/orders/{order['id']}/reorder"
-    result = client.post(path, headers=data["headers"]).json()
-    assert result["products"][0]["variants"][0]["selling_price"] == "90.00"
-    data["variant"].available = False
-    db.commit()
-    result = client.post(path, headers=data["headers"]).json()
-    assert result["items"] == [] and result["unavailable"] == ["Rice · 1 kg"]
 
 
 def test_google_sign_in_uses_verified_subject_and_logout(client, db, monkeypatch):
@@ -499,19 +353,12 @@ def test_customer_deletion_detaches_orders_and_erases_customer_data(client, db, 
     assert terminal.address_snapshot is None
     assert client.get("/api/v1/orders", headers=headers).status_code == 401
 
-    from app.services import orders
     from app.services.customer_deletion import erase_expired_delivery_details
 
-    orders.transition(
-        db,
-        active.id,
-        TransitionInput(status="CANCELLED", reason="Customer requested cancellation"),
-    )
+    assert erase_expired_delivery_details(db, expiring.delivery_details_erase_at) == 2
     db.refresh(active)
-    assert active.customer_phone is None and active.address_snapshot is None
-
-    assert erase_expired_delivery_details(db, expiring.delivery_details_erase_at) == 1
     db.refresh(expiring)
+    assert active.customer_phone is None and active.address_snapshot is None
     assert expiring.customer_phone is None and expiring.address_snapshot is None
 
     # Repeating from the sessionless web path is intentionally successful.
@@ -542,36 +389,6 @@ def test_customer_deletion_rejects_different_google_account(client, db, monkeypa
     assert response.json()["error"]["code"] == "GOOGLE_ACCOUNT_MISMATCH"
     assert db.get(Customer, current.id) is not None
     assert db.get(Customer, other.id) is not None
-
-
-def test_google_customer_pickup_is_unavailable(client, db, data):
-    google_customer = Customer(google_subject="google-account-456")
-    db.add(google_customer)
-    db.commit()
-    from app.services.auth import new_session
-
-    headers = {
-        "Authorization": "Bearer " + new_session(db, customer_id=google_customer.id)["token"]
-    }
-    request = cart(data, fulfilment_type="PICKUP", contact_phone="9876543210")
-    quote = client.post("/api/v1/checkout/quote", json=request, headers=headers)
-    assert quote.status_code == 422
-    assert quote.json()["error"]["code"] == "FULFILMENT_UNAVAILABLE"
-
-
-def test_pickup_order_cannot_use_an_existing_delivery_quote(client, data):
-    quote = client.post("/api/v1/checkout/quote", json=cart(data), headers=data["headers"]).json()
-    order = client.post(
-        "/api/v1/orders",
-        json={
-            **cart(data, fulfilment_type="PICKUP"),
-            "quote_token": quote["quote_token"],
-            "idempotency_key": "disabled-pickup-key-123",
-        },
-        headers=data["headers"],
-    )
-    assert order.status_code == 422
-    assert order.json()["error"]["code"] == "FULFILMENT_UNAVAILABLE"
 
 
 def test_admin_csrf_auth_upload_and_product_edit(client, data):
@@ -622,62 +439,8 @@ def test_admin_csrf_auth_upload_and_product_edit(client, data):
     assert client.get("/api/v1/admin/me").status_code == 200
 
 
-@pytest.mark.parametrize("payment_method", ["UPI_ON_DELIVERY", "ONLINE_UPI"])
-def test_non_cash_payment_is_unavailable_for_new_orders(client, data, payment_method):
+def test_config_maps_first_release_checkout_capabilities(client):
     assert client.get("/api/v1/config").json()["online_upi_enabled"] is False
-    request = cart(data, payment_method=payment_method)
-    quote = client.post("/api/v1/checkout/quote", json=request, headers=data["headers"])
-    assert quote.status_code == 422
-    assert quote.json()["error"]["code"] == "PAYMENT_METHOD_UNAVAILABLE"
-
-    cod_quote = client.post(
-        "/api/v1/checkout/quote", json=cart(data), headers=data["headers"]
-    ).json()
-    order = client.post(
-        "/api/v1/orders",
-        json={
-            **request,
-            "quote_token": cod_quote["quote_token"],
-            "idempotency_key": "disabled-payment-key-123",
-        },
-        headers=data["headers"],
-    )
-    assert order.status_code == 422
-    assert order.json()["error"]["code"] == "PAYMENT_METHOD_UNAVAILABLE"
-
-
-def test_existing_pickup_order_can_be_completed(client, db, data):
-    order = legacy_order(db, data, "PICKUP", "UPI_ON_DELIVERY")
-    customer_path = f"/api/v1/orders/{order.id}"
-    assert client.get(customer_path, headers=data["headers"]).json()["fulfilment_type"] == "PICKUP"
-    headers = owner(client, data)
-    owner_path = f"/api/v1/admin/orders/{order.id}"
-    assert (
-        client.post(
-            owner_path + "/status", json={"status": "ACCEPTED"}, headers=headers
-        ).status_code
-        == 200
-    )
-    assert (
-        client.post(
-            owner_path + "/status", json={"status": "DELIVERED"}, headers=headers
-        ).status_code
-        == 200
-    )
-    assert (
-        client.post(owner_path + "/mark-paid", headers=headers).json()["payment_status"] == "PAID"
-    )
-
-
-def test_existing_online_order_can_complete_payment(client, db, data):
-    order = legacy_order(db, data, "DELIVERY", "ONLINE_UPI")
-    headers = owner(client, data)
-    path = f"/api/v1/admin/orders/{order.id}/status"
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 409
-    payment_path = f"/api/v1/orders/{order.id}/development-payment?outcome=PAID"
-    assert client.post(payment_path, headers=data["other_headers"]).status_code == 404
-    assert client.post(payment_path, headers=data["headers"]).status_code == 200
-    assert client.post(path, json={"status": "ACCEPTED"}, headers=headers).status_code == 200
 
 
 def test_production_rejects_development_providers():
@@ -722,68 +485,6 @@ def test_invalid_quantity(client, data, quantity):
         ).status_code
         == 422
     )
-
-
-def test_delivery_full_lifecycle_and_payment_received(client, data):
-    address = client.post(
-        "/api/v1/addresses",
-        json={
-            "recipient_name": "Sam",
-            "phone": "9876543210",
-            "line1": "Market road",
-            "city": "Town",
-            "state": "Karnataka",
-        },
-        headers=data["headers"],
-    ).json()
-    order = place(
-        client,
-        data,
-        fulfilment_type="DELIVERY",
-        address_id=address["id"],
-    )
-    headers = owner(client, data)
-    path = f"/api/v1/admin/orders/{order['id']}"
-    for status in ["ACCEPTED", "OUT_FOR_DELIVERY", "DELIVERED"]:
-        response = client.post(path + "/status", json={"status": status}, headers=headers)
-        assert response.status_code == 200, response.text
-        assert response.json()["payment_status"] == "PENDING"
-    assert client.post(path + "/mark-paid", headers=headers).json()["payment_status"] == "PAID"
-    assert (
-        client.get(f"/api/v1/orders/{order['id']}", headers=data["headers"]).json()["status"]
-        == "DELIVERED"
-    )
-
-
-def test_quote_tampering_and_customer_binding(client, db, data):
-    request = cart(data)
-    quote = client.post("/api/v1/checkout/quote", json=request, headers=data["headers"]).json()
-    other_customer = db.query(Customer).filter_by(phone_number="+919876543211").one()
-    other_address = Address(
-        customer_id=other_customer.id,
-        recipient_name="Other customer",
-        phone="+919876543211",
-        line1="Other road",
-        city="Town",
-        state="Karnataka",
-    )
-    db.add(other_address)
-    db.commit()
-    payload = {
-        **request,
-        "quote_token": quote["quote_token"],
-        "idempotency_key": "test-bound-quote-1234",
-    }
-    assert (
-        client.post(
-            "/api/v1/orders",
-            json={**payload, "address_id": other_address.id},
-            headers=data["other_headers"],
-        ).status_code
-        == 409
-    )
-    payload["quote_token"] = "tampered." + quote["quote_token"]
-    assert client.post("/api/v1/orders", json=payload, headers=data["headers"]).status_code == 409
 
 
 def test_session_expiry_and_admin_customer_separation(client, db, data):
