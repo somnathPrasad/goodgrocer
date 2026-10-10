@@ -186,8 +186,8 @@ export default function DeleteAccountFlow() {
         )}
         <p className="help">
           Need help? Email{" "}
-          <a href="mailto:somnathprasad559@gmail.com">
-            somnathprasad559@gmail.com
+          <a href="mailto:support@goodgrocer.site">
+            support@goodgrocer.site
           </a>
           .
         </p>
