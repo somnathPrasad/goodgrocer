@@ -26,7 +26,12 @@ process-liveness check without a database query. Startup never seeds or migrates
 Products link to many flat categories and have flexible variants. Prices are
 Numeric(12,2), never floating point. Public catalogue queries paginate and load
 related categories/brands/variants in batches. Inactive products/variants are
-hidden; active unavailable products remain visible. Search uses PostgreSQL ILIKE.
+hidden. Customer home and category lists filter for available products with at
+least one active, available variant before counting and paginating. Nonblank
+search queries retain active unavailable products; blank queries use the browsing
+filter. Product detail, favourites and admin listings retain their availability
+visibility rules, and active unavailable variants remain in customer responses.
+Search uses PostgreSQL ILIKE.
 
 Customer and admin sessions are opaque random tokens, stored as hashes with
 expiry and explicit logout. Admin credentials use Argon2 and a prompted bootstrap

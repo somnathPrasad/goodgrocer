@@ -5,6 +5,15 @@ catalogue continuity and first-release checkout choices.
 
 ## Language
 
+**Orderable variant**:
+A product option whose product and variant are both active and available.
+_Avoid_: product availability alone
+
+**Unavailable product**:
+A product with no orderable variant, including a product marked unavailable or
+one with no active, available options.
+_Avoid_: out of stock, inventory count
+
 **Browsing continuity**:
 The customer continues to see the last loaded catalogue content while newer
 content is being retrieved.

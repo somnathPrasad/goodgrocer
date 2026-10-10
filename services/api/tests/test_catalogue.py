@@ -55,6 +55,91 @@ def test_customer_catalogue_filters_searches_and_paginates(db, data):
     assert catalogue.list_products(db)["items"] == []
 
 
+@pytest.mark.parametrize(
+    "unavailable_reason",
+    ["product_unavailable", "variant_unavailable", "variant_inactive", "no_variants"],
+)
+def test_unavailable_products_are_hidden_from_browsing_but_searchable(
+    client, db, data, unavailable_reason
+):
+    product = data["product"]
+    if unavailable_reason == "product_unavailable":
+        product.available = False
+    elif unavailable_reason == "variant_unavailable":
+        data["variant"].available = False
+    elif unavailable_reason == "variant_inactive":
+        data["variant"].active = False
+    else:
+        db.delete(data["variant"])
+    db.flush()
+
+    for params in ({}, {"q": ""}, {"q": "   "}, {"category_id": data["categories"][0].id}):
+        response = client.get("/api/v1/products", params=params)
+        assert response.status_code == 200
+        assert response.json()["items"] == []
+        assert response.json()["total"] == 0
+
+    for params in ({"q": "ric"}, {"q": "ric", "category_id": data["categories"][0].id}):
+        response = client.get("/api/v1/products", params=params)
+        assert response.status_code == 200
+        assert [item["id"] for item in response.json()["items"]] == [product.id]
+        assert response.json()["total"] == 1
+
+    assert client.get(f"/api/v1/products/{product.id}").status_code == 200
+    assert catalogue.list_products(db, admin=True)["total"] == 1
+    product.active = False
+    db.flush()
+    assert client.get("/api/v1/products", params={"q": "ric"}).json()["items"] == []
+
+
+def test_browsing_filters_before_pagination_and_retains_unavailable_choices(db, data):
+    data["product"].available = False
+    visible_ids = []
+    for index in range(2):
+        product = Product(
+            name=f"Rice {index}",
+            slug=f"rice-{index}",
+            brand_id=data["product"].brand_id,
+            categories=data["categories"],
+        )
+        db.add(product)
+        db.flush()
+        visible_ids.append(product.id)
+        for available in (True, True, False):
+            db.add(
+                ProductVariant(
+                    product_id=product.id,
+                    name="Regular",
+                    mrp=Decimal("10"),
+                    selling_price=Decimal("9"),
+                    available=available,
+                )
+            )
+    db.flush()
+
+    for page, product_id in enumerate(visible_ids, start=1):
+        result = catalogue.list_products(db, page=page, page_size=1)
+        assert result["total"] == 2
+        assert [item.id for item in result["items"]] == [product_id]
+        assert [variant.available for variant in result["items"][0].variants] == [True, True, False]
+    assert catalogue.list_products(db, page=3, page_size=1)["items"] == []
+
+
+def test_explicit_availability_filters_cannot_bypass_browsing_rule(db, data):
+    data["product"].available = False
+    db.flush()
+    assert catalogue.list_products(db, available=False)["total"] == 0
+    assert catalogue.list_products(db, q="ric", available=False)["total"] == 1
+    assert catalogue.list_products(db, admin=True, available=False)["total"] == 1
+
+    data["product"].available = True
+    data["variant"].available = False
+    db.flush()
+    assert catalogue.list_products(db, available=True)["total"] == 0
+    assert catalogue.list_products(db, q="ric", available=True)["total"] == 1
+    assert catalogue.list_products(db, admin=True, available=True)["total"] == 1
+
+
 def test_owner_catalogue_updates_category_order_and_variant_visibility(db, data):
     category = data["categories"][0]
     catalogue.save_category(

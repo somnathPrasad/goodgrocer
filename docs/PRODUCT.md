@@ -23,8 +23,14 @@ Variants have flexible labels (500 g, 2 L, Family Pack, Regular), display order,
 MRP and selling price (decimal rupees), active and available flags.
 `0 <= selling_price <= mrp`. No unit taxonomy or inventory quantities.
 An item is orderable only if product.active AND product.available AND
-variant.active AND variant.available. Inactive items are hidden; unavailable
-active items remain visible with an unavailable label. Admin controls availability.
+variant.active AND variant.available. Inactive items are hidden. Home and category
+catalogue lists show only products with at least one orderable variant. Searches
+with a nonblank query also show active unavailable products with an unavailable
+label; clearing search restores the filtered catalogue. Product detail and
+favourites retain active unavailable products. Active unavailable variants remain
+visible as disabled choices. Admin controls availability and can view unavailable
+products. Explicit availability filters do not bypass the orderable-product rule
+outside search; pagination totals count only matching visible products.
 
 ## Orders and checkout
 

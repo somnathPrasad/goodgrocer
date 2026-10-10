@@ -63,9 +63,16 @@ def list_products(
     query = select(Product)
     if not admin:
         query = query.where(Product.active.is_(True))
+        if not (q and q.strip()):
+            query = query.where(
+                Product.available.is_(True),
+                Product.variants.any(
+                    ProductVariant.active.is_(True) & ProductVariant.available.is_(True)
+                ),
+            )
     elif active is not None:
         query = query.where(Product.active == active)
-    if q:
+    if q and q.strip():
         query = query.where(
             Product.name.ilike("%" + q.replace("%", r"\%").replace("_", r"\_") + "%")
         )
