@@ -60,8 +60,7 @@ can cancel; the customer may reorder. No money is transferred.
   Android. FastAPI validates and re-encodes uploads before storing immutable
   `catalogue/*.jpg` objects. The app does not create the bucket at startup.
 - Local seed media is not migrated to production. Replaced production objects are
-  retained; add an operator cleanup process after deciding retention, never delete
-  historical references indiscriminately.
+  retained until the operator runs the unused-image cleanup described below.
 - Schedule database/media backups and practice restore. Establish log rotation
   and retention, session/rate-limit/legacy-OTP cleanup and operational alerts.
   Request logs contain method/path/status/duration/request ID, not auth bodies.
@@ -73,6 +72,48 @@ can cancel; the customer may reorder. No money is transferred.
 - Confirm store contact information and delivery fee.
   Fees default to zero. Addresses are manually assessed, without serviceability
   APIs. The owner must record received cash payments explicitly.
+
+## Clean up unused catalogue images
+
+Run from the repository root with the API's existing environment configuration:
+`DATABASE_URL` must point to the database using the configured Supabase project
+and bucket. The script reads product and category image references directly through
+the backend, including inactive and unavailable rows. It scans JPEG, PNG and WebP
+images under `catalogue/` in `SUPABASE_STORAGE_BUCKET`; other files and folders
+outside that prefix are untouched. Orders do not store image references.
+
+```sh
+# Preview paths, counts and known reclaimable bytes; no deletion.
+sh scripts/cleanup-images.sh
+
+# Permanently delete unreferenced images that are at least 24 hours old.
+sh scripts/cleanup-images.sh --delete
+
+# Optional longer grace period for unfinished catalogue edits.
+sh scripts/cleanup-images.sh --delete --min-age-hours 72
+```
+
+The default 24-hour grace period covers both creation and last modification.
+Images with missing or invalid timestamps are skipped. Choose a longer grace
+period if owner edits can remain unfinished longer; avoid running deletion while
+an owner has an unsaved edit referencing an older unused image. `--min-age-hours 0`
+disables the grace period. Verify the dry run and database/project pairing before
+using `--delete`.
+
+Listing completes before any deletion. Delete mode then locks product and category
+tables, reads current references again, and holds the locks through deletion to
+prevent concurrent catalogue writes and cleanup runs from changing the decision.
+Customer reads continue, but owner catalogue saves may wait; run during a quiet
+period. A five-second database lock timeout aborts a busy run. Storage requests
+have a 30-second timeout and deletion uses batches of 100 through the Storage API,
+as required by [Supabase's deletion guidance](https://supabase.com/docs/guides/storage/management/delete-objects).
+The server-only secret needs Storage list/delete access. No new credentials or
+dependencies are required.
+
+The script exits nonzero on failure and reports each confirmed deletion batch.
+Storage deletions are permanent and cannot roll back if a later batch fails;
+inspect storage and rerun the preview after a failed run. Cleanup is manual unless
+the operator schedules this command.
 
 Infrastructure provisioning, release signing, a full penetration test, production
 load testing and real payment certification are not delivered by a local V1.
