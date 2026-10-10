@@ -1,15 +1,13 @@
 package com.goodgrocer.app.ui
 
 import android.app.Activity
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -40,9 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import com.goodgrocer.app.BuildConfig
+import com.goodgrocer.app.R
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.launch
 
@@ -74,12 +73,11 @@ fun EntryScreen(vm: ShopViewModel, done: () -> Unit) {
             Modifier.fillMaxWidth().padding(top = 34.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier.size(38.dp).background(Forest, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("g", color = Lime, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-            }
+            Image(
+                painter = painterResource(R.drawable.goodgrocer_logo),
+                contentDescription = null,
+                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
+            )
             Text(
                 "goodgrocer",
                 Modifier.padding(start = 10.dp),
@@ -176,64 +174,17 @@ fun EntryScreen(vm: ShopViewModel, done: () -> Unit) {
 
 @Composable
 private fun GoogleMark(modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val stroke = size.minDimension * .22f
-        val inset = stroke / 2
-        val arcSize = Size(size.width - stroke, size.height - stroke)
-        drawArc(
-            Color(0xFF4285F4),
-            -42f,
-            90f,
-            false,
-            Offset(inset, inset),
-            arcSize,
-            style = Stroke(stroke)
-        )
-        drawArc(
-            Color(0xFF34A853),
-            48f,
-            82f,
-            false,
-            Offset(inset, inset),
-            arcSize,
-            style = Stroke(stroke)
-        )
-        drawArc(
-            Color(0xFFFBBC05),
-            130f,
-            70f,
-            false,
-            Offset(inset, inset),
-            arcSize,
-            style = Stroke(stroke)
-        )
-        drawArc(
-            Color(0xFFEA4335),
-            200f,
-            118f,
-            false,
-            Offset(inset, inset),
-            arcSize,
-            style = Stroke(stroke)
-        )
-        drawLine(
-            Color(0xFF4285F4),
-            Offset(size.width * .54f, size.height * .50f),
-            Offset(size.width * .94f, size.height * .50f),
-            stroke
-        )
-    }
+    // Official Google sign-in artwork: https://developers.google.com/identity/branding-guidelines
+    Image(
+        painter = painterResource(R.drawable.ic_google),
+        contentDescription = null,
+        modifier = modifier
+    )
 }
 
 @Composable
 private fun GroceryArtwork(modifier: Modifier = Modifier) {
-    val tagPaint = remember {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Forest.toArgb()
-            typeface = Typeface.DEFAULT_BOLD
-            textAlign = Paint.Align.CENTER
-        }
-    }
+    val logo = painterResource(R.drawable.goodgrocer_logo)
     val produceDrop = remember { Animatable(-16f) }
     LaunchedEffect(Unit) {
         produceDrop.animateTo(0f, tween(850, easing = FastOutSlowInEasing))
@@ -506,22 +457,20 @@ private fun GroceryArtwork(modifier: Modifier = Modifier) {
             )
             drawLine(Color(0xFFB99661), p(157f, 280f), p(203f, 280f), 1f * scale)
 
-            // The small handle tag carries the monogram without dominating the bag.
+            // The small handle tag carries the brand logo without dominating the bag.
             drawLine(Forest, p(237f, 171f), p(251f, 184f), 2f * scale)
             drawRoundRect(
-                Lime,
+                Forest,
                 topLeft = p(243f, 181f),
                 size = Size(27f * scale, 33f * scale),
                 cornerRadius = CornerRadius(5f * scale)
             )
-            drawCircle(Forest, 2f * scale, p(251f, 186f))
-            tagPaint.textSize = 17f * scale
-            drawContext.canvas.nativeCanvas.drawText(
-                "g",
-                256f * scale,
-                205f * scale,
-                tagPaint
-            )
+            drawCircle(Cream, 2f * scale, p(251f, 186f))
+            translate(left = 245f * scale, top = 189f * scale) {
+                with(logo) {
+                    draw(Size(23f * scale, 23f * scale))
+                }
+            }
         }
     }
 }
