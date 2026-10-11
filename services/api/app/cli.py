@@ -181,6 +181,7 @@ def main():
             "bootstrap-admin",
             "export-openapi",
             "erase-expired-customer-data",
+            "erase-expired-whatsapp-webhooks",
         ],
     )
     args = parser.parse_args()
@@ -195,6 +196,13 @@ def main():
             count = erase_expired_delivery_details(db)
             db.commit()
         print(f"Erased delivery details from {count} retained order(s).")
+    elif args.command == "erase-expired-whatsapp-webhooks":
+        from app.services.whatsapp_webhooks import erase_expired_deliveries
+
+        with SessionLocal() as db:
+            count = erase_expired_deliveries(db)
+            db.commit()
+        print(f"Erased {count} expired WhatsApp webhook delivery record(s).")
     else:
         from app.main import app
 

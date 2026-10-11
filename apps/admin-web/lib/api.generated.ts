@@ -331,6 +331,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/webhooks/whatsapp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Verify Webhook */
+    get: operations["verify_webhook_api_v1_webhooks_whatsapp_get"];
+    put?: never;
+    /** Receive Webhook */
+    post: operations["receive_webhook_api_v1_webhooks_whatsapp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/admin/auth/login": {
     parameters: {
       query?: never;
@@ -1756,6 +1774,59 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  verify_webhook_api_v1_webhooks_whatsapp_get: {
+    parameters: {
+      query?: {
+        "hub.mode"?: string | null;
+        "hub.verify_token"?: string | null;
+        "hub.challenge"?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  receive_webhook_api_v1_webhooks_whatsapp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
         };
       };
     };

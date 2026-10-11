@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -131,6 +132,13 @@ class OTP(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(default=0)
+
+
+class WhatsAppWebhookDelivery(Base):
+    __tablename__ = "whatsapp_webhook_deliveries"
+    payload_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    raw_body: Mapped[bytes] = mapped_column(LargeBinary)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
 
 
 class Address(Timestamp, Base):

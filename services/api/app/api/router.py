@@ -13,6 +13,7 @@ from app.api.routes.favourites import router as favourites_router
 from app.api.routes.health import router as health_router
 from app.api.routes.images import router as images_router
 from app.api.routes.orders import router as orders_router
+from app.api.routes.whatsapp_webhooks import router as whatsapp_webhooks_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -22,6 +23,7 @@ api_router.include_router(customer_auth_router)
 api_router.include_router(addresses_router)
 api_router.include_router(favourites_router)
 api_router.include_router(orders_router)
+api_router.include_router(whatsapp_webhooks_router)
 api_router.include_router(admin_auth_router)
 api_router.include_router(protected_admin_auth_router)
 api_router.include_router(admin_dashboard_router)

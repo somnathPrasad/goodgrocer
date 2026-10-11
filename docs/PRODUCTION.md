@@ -22,6 +22,54 @@ client ID. Test on an Android device with Google Play services and the release
 signing certificate before opening login. Contact phones are collected for
 fulfilment and are not treated as verified identity.
 
+### WhatsApp webhook
+
+The callback path is `/api/v1/webhooks/whatsapp` (no trailing slash). It captures
+incoming events and delivery statuses; it does not send OTPs or change customer
+login yet.
+
+1. Set backend-only `WHATSAPP_WEBHOOK_VERIFY_TOKEN` to a random value (generate
+   locally with `openssl rand -hex 32`). Set `WHATSAPP_APP_SECRET` to the **App
+   secret** from Meta App Dashboard > App settings > Basic. This is not a WhatsApp
+   access token, the webhook Verify token, or the Goodgrocer `SECRET_KEY`.
+   Store both values in the deployment's secret environment settings; do not put
+   them in Android, browser code, Git, logs or screenshots.
+2. Run `uv run --directory services/api alembic upgrade head` as a release step
+   and deploy/restart the API with those environment variables.
+3. Ensure GET and POST reach the API through a public HTTPS URL with a valid
+   trusted certificate. Preserve the raw POST body and `X-Hub-Signature-256`
+   header. Set proxy request limits to allow up to 4 MiB; the API rejects larger
+   payloads with 413. Do not log webhook bodies, signature headers or GET query
+   strings (the latter contain the Verify token). The API's own request logger
+   logs the path only. If enabling Meta's optional mTLS, configure certificate
+   validation at the TLS proxy; application HMAC checks still apply.
+4. In Meta's WhatsApp Configuration (or Use cases > Customize > Configuration),
+   enter Callback URL `https://YOUR_API_HOST/api/v1/webhooks/whatsapp` and the
+   exact `WHATSAPP_WEBHOOK_VERIFY_TOKEN` value in Verify token. Select Verify and
+   save, then subscribe to `messages` for incoming messages and outbound message
+   statuses. Ensure the app is also subscribed to the intended WABA.
+5. Send a Meta test webhook and confirm a 200 response and a stored row in
+   `whatsapp_webhook_deliveries`. Confirm real delivery after the sender/WABA
+   subscription is configured. No live Meta verification is performed by local
+   backend tests.
+
+GET verification returns the challenge as unquoted plain text only for
+`hub.mode=subscribe` and the matching token. POST rejects missing/incorrect
+HMAC-SHA256 signatures before parsing or storage. It accepts a WhatsApp Business
+Account envelope with an `entry` array, preserving every entry/update in the raw
+batch without depending on specific subscribed fields. Unconfigured secrets
+return 503. Invalid requests return 4xx; capture/commit failures return non-200
+so Meta can retry. Exact-byte retries return 200 without adding another row;
+different batches containing the same events are captured separately. Nothing
+marks an OTP verified from a delivery/read status or incoming message.
+
+Raw payloads include personal data. Restrict database/backup access and schedule
+`uv run --directory services/api python -m app.cli erase-expired-whatsapp-webhooks`
+at least daily to erase records aged 30 days or more. Align backup retention and
+the published privacy policy with this diagnostic storage before enabling real
+customer events. Cleanup is not scheduled automatically and payloads cannot be
+recovered from Meta after deletion.
+
 ### Online UPI
 
 Choose a provider and extend `PaymentProvider` with its order/payment creation

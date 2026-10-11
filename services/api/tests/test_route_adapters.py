@@ -34,4 +34,5 @@ def test_v1_endpoints_are_owned_by_domain_oriented_adapters():
         "app.api.routes.favourites",
         "app.api.routes.images",
         "app.api.routes.orders",
+        "app.api.routes.whatsapp_webhooks",
     }

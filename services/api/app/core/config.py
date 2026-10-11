@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     secret_key: str = "local-development-only-change-before-production"
     google_web_client_id: str | None = None
     google_geocoding_api_key: SecretStr | None = None
+    whatsapp_webhook_verify_token: SecretStr | None = Field(default=None, min_length=1)
+    whatsapp_app_secret: SecretStr | None = Field(default=None, min_length=1)
     payment_provider: Literal["development", "disabled"] = "development"
     image_storage_provider: Literal["local", "supabase"] = "local"
     media_dir: Path = Path(__file__).resolve().parents[2] / "media"

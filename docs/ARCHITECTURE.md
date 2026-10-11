@@ -94,6 +94,17 @@ TypeScript types. Both Android apps use explicit Moshi DTOs, verified by builds.
 
 ## External services
 
+FastAPI exposes GET and POST `/api/v1/webhooks/whatsapp`. GET checks a server-only
+verification token and echoes Meta's challenge as plain text. POST verifies the
+HMAC-SHA256 signature over the exact request bytes using the Meta app secret,
+validates the WhatsApp JSON envelope, and commits the complete raw batch to
+PostgreSQL before acknowledging it. A payload SHA256 primary key deduplicates
+identical deliveries across workers. There is no event processing yet; future
+consumers must also deduplicate message/status events across differently batched
+deliveries. Raw payloads may contain personal data and are erased after 30 days
+by the operator-scheduled backend cleanup command. TLS terminates at the deployment
+proxy; optional Meta mTLS must also be configured there.
+
 Protocols isolate payment attempts and image storage. Development
 providers run only outside production. Local development and tests re-encode
 media and store it on disk, with `/media` references in the database. Production

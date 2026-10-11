@@ -184,6 +184,8 @@ Root `.env` is read independently of the current working directory:
 | `SECRET_KEY` | Signs checkout quotes; replace with a random secret for production |
 | `GOOGLE_WEB_CLIENT_ID` | Google OAuth web client ID used as the API token audience; required in production |
 | `GOOGLE_GEOCODING_API_KEY` | Server-side key for Google Geocoding address suggestions; optional for manual addresses |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Server-only random string matching Meta's webhook Verify token; optional until webhook setup |
+| `WHATSAPP_APP_SECRET` | Server-only Meta app secret for webhook HMAC verification; optional until webhook setup |
 | `PAYMENT_PROVIDER` | `development` or `disabled`; production adapter not yet selected |
 | `IMAGE_STORAGE_PROVIDER` | `local` for development/tests; production requires `supabase` |
 | `SUPABASE_URL` | Supabase project HTTPS URL; required for Supabase image storage |

@@ -307,3 +307,19 @@ owner clients show the retention state. A daily cleanup command enforces the
 30-day maximum. Android deletion additionally clears all local shopping and
 customer data. Reauthentication after deletion creates a new Customer without
 restoring history.
+
+## ADR-012: Capture signed WhatsApp webhook deliveries in PostgreSQL
+
+- Date: 2026-10-11
+- Status: Accepted
+
+Meta retries unacknowledged webhooks and provides no historical webhook retrieval.
+Use the existing FastAPI/PostgreSQL boundary to validate signatures and commit
+complete raw deliveries before returning 200, rather than acknowledging first
+and relying on in-memory background work. Exact payload hashes deduplicate
+retries without introducing a queue or new service. Future event consumers must
+deduplicate individual message/status events across re-batched deliveries.
+Capture is preparation for WhatsApp OTP login; the existing Google login remains
+active until that separate implementation is complete. Retain raw deliveries for
+30 days for integration diagnosis, with daily operator-scheduled cleanup and
+restricted database access because they can contain phone numbers and message text.
