@@ -443,7 +443,7 @@ fun AddressEditor(
             landmark =
                 it
         })
-        if (locality.isNotBlank()) Text("Area: $locality")
+        ShopField("Area / locality (optional)", locality, { locality = it })
         ShopField("City / town *", city, {
             city =
                 it
@@ -454,7 +454,6 @@ fun AddressEditor(
         }
         if (moreDetails) {
             ShopField("Address line 2 (optional)", line2, { line2 = it })
-            ShopField("Locality (optional)", locality, { locality = it })
             ShopField("Postal code (optional)", postal, { postal = it })
         }
         PrimaryButton(

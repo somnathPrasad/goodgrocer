@@ -62,6 +62,8 @@ delivery and COD only; pickup and other payment methods are disabled.
 Delivery serviceability is decided manually by the owner, who may cancel an
 unserviceable order. Customers can select a delivery pin on Google Maps and
 confirm an address suggested from that location, or enter the address manually.
+The address form always exposes an editable optional Area / locality field,
+prefilled from the map suggestion when available.
 The pin and suggested text do not establish serviceability. No geofences, routing
 or automatic address validation.
 Delivery fee is configurable (default zero), with no minimum order or discounts.

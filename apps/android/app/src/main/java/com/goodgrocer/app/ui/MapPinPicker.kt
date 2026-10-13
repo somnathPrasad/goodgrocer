@@ -7,8 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,8 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -114,40 +115,47 @@ fun MapPinPicker(initial: LatLng, confirm: (LatLng) -> Unit, cancel: () -> Unit)
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Move the map until the pin is at your delivery entrance.", Modifier.padding(20.dp))
-        TextButton(onClick = {
-            if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED ||
-                context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                centerOnCurrentLocation()
-            } else {
-                locationPermission.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    )
-                )
-            }
-        }) { Text("Use my current location") }
         locationMessage?.let { Text(it, Modifier.padding(horizontal = 20.dp)) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-            Surface(
-                modifier = Modifier.align(Alignment.Center).offset(y = (-20).dp),
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color.White,
-                shadowElevation = 8.dp
+            Icon(
+                Icons.Default.LocationOn,
+                contentDescription = "Selected delivery location",
+                tint = MaterialTheme.colorScheme.primary,
+                // Align the visible tip with the map's center camera target.
+                modifier = Modifier.align(Alignment.Center).offset(y = (-15).dp).size(36.dp)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.weight(1f)) {
+                PrimaryButton("Confirm pin", click = { confirm(selected) })
+            }
+            TextButton(
+                onClick = {
+                    if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED ||
+                        context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        centerOnCurrentLocation()
+                    } else {
+                        locationPermission.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            )
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp)
             ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = "Selected delivery location",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp).size(36.dp)
-                )
+                Text("Use my current location", textAlign = TextAlign.Center)
             }
         }
-        PrimaryButton("Confirm pin", click = { confirm(selected) })
         TextButton(onClick = cancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Enter address manually")
         }
