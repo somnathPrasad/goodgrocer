@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const playStoreUrl = process.env.NEXT_PUBLIC_PLAY_STORE_URL;
 
 function PlayStoreAction() {
@@ -64,46 +66,20 @@ export default function Home() {
             <span>Cash on delivery</span>
           </div>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="sun" />
-          <div className="leaf leaf-one" />
-          <div className="leaf leaf-two" />
+        <div className="hero-art">
+          <div className="sun" aria-hidden="true" />
+          <div className="leaf leaf-one" aria-hidden="true" />
+          <div className="leaf leaf-two" aria-hidden="true" />
           <div className="phone">
-            <div className="phone-top">
-              <span className="mini-mark">g</span>
-              <b>Good morning</b>
-            </div>
-            <div className="search-pill">What are you looking for?</div>
-            <div className="aisle-title">
-              <b>Everyday favourites</b>
-              <span>See all</span>
-            </div>
-            <div className="product-grid">
-              <div className="product-card">
-                <span>🍅</span>
-                <b>Tomatoes</b>
-                <small>Fresh produce</small>
-              </div>
-              <div className="product-card">
-                <span>🥛</span>
-                <b>Fresh milk</b>
-                <small>Dairy & breakfast</small>
-              </div>
-              <div className="product-card">
-                <span>🍚</span>
-                <b>Basmati rice</b>
-                <small>Pantry essentials</small>
-              </div>
-              <div className="product-card">
-                <span>🍌</span>
-                <b>Bananas</b>
-                <small>Fresh produce</small>
-              </div>
-            </div>
-            <div className="basket-bar">
-              <span>3 items</span>
-              <b>View basket →</b>
-            </div>
+            <Image
+              className="app-screenshot"
+              src="/images/goodgrocer-app-catalogue.webp"
+              alt="Goodgrocer Android app showing grocery categories, everyday essentials, and navigation for shopping, search, saved products, orders, and your account."
+              width={720}
+              height={1505}
+              sizes="(max-width: 560px) 264px, 292px"
+              loading="eager"
+            />
           </div>
         </div>
       </section>

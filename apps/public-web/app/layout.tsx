@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import "./globals.css";
 
@@ -12,7 +13,13 @@ export const metadata: Metadata = {
 function Brand() {
   return (
     <Link className="brand" href="/" aria-label="Goodgrocer home">
-      <span className="brand-mark">g</span>
+      <Image
+        className="brand-mark"
+        src="/images/goodgrocer-app-icon.png"
+        alt=""
+        width={38}
+        height={38}
+      />
       <span>goodgrocer</span>
     </Link>
   );
