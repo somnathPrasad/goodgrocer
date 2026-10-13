@@ -41,6 +41,19 @@ and keys customers by the stable `sub` claim. The backend rate limits exchanges.
 Contact phone numbers belong to delivery addresses or pickup orders. No Redis,
 roles or service decomposition.
 
+Customer address onboarding is optional and offered at most once per Customer.
+PostgreSQL stores `address_onboarding_seen` on the Customer, so sign-out,
+reinstallation, another device or deleting addresses cannot reset it. Authenticated
+GET `/api/v1/account/address-onboarding` checks the flag and saved addresses
+without consuming the offer. POST on the same path locks and refreshes the
+Customer, rechecks eligibility, and atomically consumes an eligible offer.
+Only the client receiving `eligible=true` from that claim opens the editor.
+This claim happens immediately before display to prevent concurrent devices
+from showing it twice; a lost claim response or process exit between claim and
+render can consume the offer without displaying it. This deliberately favors
+avoiding repeated prompts over guaranteed display. Customer deletion removes
+the flag together with the Customer.
+
 Checkout produces a signed, expiring quote. Order creation revalidates it while
 locking involved product/variant rows, serializes submissions per customer and
 uses a unique idempotency key. Orders snapshot prices, names and addresses.
@@ -77,7 +90,14 @@ check. The admin Android app polls dashboard and orders every 30 seconds.
 
 Android uses UI → ViewModel → Repository → API/local storage. The customer app
 opens at a Google sign-in entry screen when no session is stored, then gives
-access to catalogue and basket. The basket persists in private preferences across
+access to catalogue and basket. After sign-in and on authenticated app reopening,
+Android checks address-onboarding eligibility before selecting Home or the
+existing address editor. Skip, Back and successful save return to Home. A failed
+eligibility read makes no claim and proceeds to Home; a later opening retries.
+Rotation preserves the current screen rather than rerunning onboarding. The
+editor retains the existing map/manual-entry flow. Address write responses update
+the local address list directly so a failed follow-up refresh cannot misreport
+a successful save. The basket persists in private preferences across
 sessions. Session material is
 AES-GCM encrypted using Android Keystore; backups are disabled. Checkout keys
 persist for retry safety. Money uses BigDecimal. Order details refresh every

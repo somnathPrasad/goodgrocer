@@ -140,6 +140,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/account/address-onboarding": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Address Onboarding */
+    get: operations["address_onboarding_api_v1_account_address_onboarding_get"];
+    put?: never;
+    /** Claim Address Onboarding */
+    post: operations["claim_address_onboarding_api_v1_account_address_onboarding_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/account/deletion": {
     parameters: {
       query?: never;
@@ -687,6 +705,11 @@ export interface components {
       latitude?: number | string | null;
       /** Longitude */
       longitude?: number | string | null;
+    };
+    /** AddressOnboardingOut */
+    AddressOnboardingOut: {
+      /** Eligible */
+      eligible: boolean;
     };
     /** AddressOut */
     AddressOut: {
@@ -1325,6 +1348,46 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  address_onboarding_api_v1_account_address_onboarding_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AddressOnboardingOut"];
+        };
+      };
+    };
+  };
+  claim_address_onboarding_api_v1_account_address_onboarding_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AddressOnboardingOut"];
+        };
       };
     };
   };

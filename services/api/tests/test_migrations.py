@@ -21,7 +21,16 @@ def test_migration_upgrade_downgrade_and_metadata_match():
     isolated_url = url.update_query_dict({"options": "-csearch_path=" + schema})
     env = {**os.environ, "DATABASE_URL": isolated_url.render_as_string(hide_password=False)}
     try:
-        for args in [("upgrade", "head"), ("check",), ("downgrade", "base"), ("upgrade", "head")]:
+        steps = [
+            ("upgrade", "d8a21e9c4b70"),
+            ("upgrade", "head"),
+            ("check",),
+            ("downgrade", "d8a21e9c4b70"),
+            ("upgrade", "head"),
+            ("downgrade", "base"),
+            ("upgrade", "head"),
+        ]
+        for step, args in enumerate(steps):
             result = subprocess.run(
                 [sys.executable, "-m", "alembic", *args],
                 cwd=Path(__file__).resolve().parents[1],
@@ -30,6 +39,32 @@ def test_migration_upgrade_downgrade_and_metadata_match():
                 text=True,
             )
             assert result.returncode == 0, result.stderr
+            if step == 0:
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            f'INSERT INTO "{schema}".customers '
+                            "(google_subject, created_at, updated_at) "
+                            "VALUES ('existing-google-customer', now(), now())"
+                        )
+                    )
+            elif step == 1:
+                with engine.connect() as connection:
+                    row = connection.execute(
+                        text(
+                            f'SELECT google_subject, address_onboarding_seen FROM "{schema}".customers'
+                        )
+                    ).one()
+                    assert row == ("existing-google-customer", False)
+            elif step == 3:
+                with engine.begin() as connection:
+                    subject = connection.execute(
+                        text(f'SELECT google_subject FROM "{schema}".customers')
+                    ).scalar_one()
+                    assert subject == "existing-google-customer"
+                    # Older phone-login revisions cannot represent a Google-only
+                    # Customer. Remove this fixture before cycling the full history.
+                    connection.execute(text(f'DELETE FROM "{schema}".customers'))
     finally:
         with engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))

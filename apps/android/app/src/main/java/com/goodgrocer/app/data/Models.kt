@@ -29,6 +29,7 @@ data class CartLine(val product: Product, val variant: Variant, val quantity: In
 data class CartItem(val variant_id: Int, val quantity: Int)
 data class GoogleLoginRequest(val id_token: String)
 data class AuthToken(val token: String, val expires_at: String)
+data class AddressOnboarding(val eligible: Boolean)
 data class Address(
     val id: Int? = null,
     val recipient_name: String = "",

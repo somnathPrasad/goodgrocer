@@ -49,6 +49,14 @@ _Avoid_: showing one customer's data after logout
 The Goodgrocer identity created when a person first authenticates with Google.
 _Avoid_: Google account, user account
 
+**Saved address**:
+Reusable delivery details belonging to a Customer. A saved address does not establish delivery serviceability or verify ownership of its contact phone.
+_Avoid_: verified location, account phone
+
+**Address onboarding**:
+An optional opportunity for a Customer without any saved addresses to create their first saved address.
+_Avoid_: required registration, delivery eligibility check
+
 **Customer deletion**:
 Permanent removal of a Customer's authentication identity, sessions, saved addresses, favourites, and other reusable personal data.
 _Avoid_: sign-out, Google account deletion, order cancellation
@@ -105,6 +113,11 @@ _Avoid_: first-release checkout option
   imply that prices or availability are permanent.
 - A **First-load placeholder** is distinct from **Operation progress**.
 - **Authenticated continuity** ends at logout.
+- **Address onboarding** is offered at most once per **Customer**. Seeing the
+  offer consumes it, even without saving; sign-out, reinstalling, switching
+  devices or deleting saved addresses does not reset a consumed offer.
+- Skipping **Address onboarding** leaves the **Customer** free to browse; a
+  **Saved address** is still needed for delivery checkout.
 - **Customer deletion** ends the **Customer** identity and every authenticated session permanently.
 - On Android, **Customer deletion** also clears the local cart, checkout key, authenticated caches, deletion credentials, and navigation history; sign-out continues to preserve the cart.
 - The native and web **Deletion paths** invoke the same immediate **Customer deletion** operation after separate authentication and confirmation experiences.

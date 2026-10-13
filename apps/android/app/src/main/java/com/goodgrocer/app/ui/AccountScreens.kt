@@ -354,7 +354,8 @@ fun AddressEditor(
     busy: Boolean,
     lookup: (String, String, (AddressSuggestion?) -> Unit) -> Unit,
     save: (Address) -> Unit,
-    cancel: () -> Unit
+    cancel: () -> Unit,
+    cancelLabel: String = "Cancel"
 ) {
     var name by rememberSaveable(initial.id) { mutableStateOf(initial.recipient_name) }
     var phone by rememberSaveable(initial.id) { mutableStateOf(initial.phone) }
@@ -488,6 +489,6 @@ fun AddressEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        TextButton(onClick = cancel) { Text("Cancel") }
+        TextButton(onClick = cancel, enabled = !busy) { Text(cancelLabel) }
     }
 }

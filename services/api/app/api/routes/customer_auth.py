@@ -8,8 +8,8 @@ from app.api.dependencies import (
     session_for,
 )
 from app.models.domain import Customer
-from app.schemas.domain import GoogleLoginInput, TokenResponse
-from app.services import auth, customer_deletion
+from app.schemas.domain import AddressOnboardingOut, GoogleLoginInput, TokenResponse
+from app.services import auth, customer_data, customer_deletion
 
 router = APIRouter(prefix="/api/v1")
 
@@ -26,6 +26,16 @@ def logout(
     db: Session = TRANSACTIONAL_DB,
 ):
     auth.logout(db, session_for(request, db, False))
+
+
+@router.get("/account/address-onboarding", response_model=AddressOnboardingOut, tags=["customer"])
+def address_onboarding(current: Customer = Depends(customer), db: Session = TRANSACTIONAL_DB):
+    return customer_data.address_onboarding(db, current.id)
+
+
+@router.post("/account/address-onboarding", response_model=AddressOnboardingOut, tags=["customer"])
+def claim_address_onboarding(current: Customer = Depends(customer), db: Session = TRANSACTIONAL_DB):
+    return customer_data.address_onboarding(db, current.id, claim=True)
 
 
 @router.post("/account/deletion", status_code=204, tags=["auth"])

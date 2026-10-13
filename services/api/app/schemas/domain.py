@@ -140,6 +140,10 @@ class AddressOut(AddressInput):
     id: int
 
 
+class AddressOnboardingOut(Schema):
+    eligible: bool
+
+
 class CartItem(Schema):
     variant_id: int
     quantity: int = Field(gt=0, le=99)

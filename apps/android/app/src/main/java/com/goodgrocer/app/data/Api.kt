@@ -34,6 +34,12 @@ interface Api {
     @POST("api/v1/account/deletion")
     suspend fun deleteAccount(@Body request: GoogleLoginRequest)
 
+    @GET("api/v1/account/address-onboarding")
+    suspend fun addressOnboarding(): AddressOnboarding
+
+    @POST("api/v1/account/address-onboarding")
+    suspend fun claimAddressOnboarding(): AddressOnboarding
+
     @GET("api/v1/addresses")
     suspend fun addresses(): List<Address>
 

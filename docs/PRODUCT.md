@@ -4,7 +4,14 @@
 
 One physical Kirana store, approximately 500 products, a native Android customer
 app, a native Android owner app, a public informational website and the retained store-owner web portal share one backend. The
-customer Android app opens with Google sign-in. After sign-in, customers can browse,
+customer Android app opens with Google sign-in. After sign-in, customers without
+saved addresses receive one optional address-creation offer per Customer.
+Displaying the offer consumes it; skipping or saving takes the customer to Home.
+The offer is shared across devices and reinstalls and does not reset when
+addresses are deleted. Eligibility is checked after sign-in and when reopening
+an authenticated app; failed checks allow browsing and retry on the next opening.
+Customers can add addresses later through Account or checkout, where a delivery
+address is required. After sign-in, customers can browse,
 search and use a persistent local cart. Google sign-in also authenticates checkout,
 saved addresses, account favourites and orders. A contact phone is collected from the
 delivery address; it is not an account identifier. In the first release, customers

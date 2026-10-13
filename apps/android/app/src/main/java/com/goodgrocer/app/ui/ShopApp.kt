@@ -1,8 +1,12 @@
 package com.goodgrocer.app.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -13,6 +17,7 @@ import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,14 +30,17 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -41,6 +49,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.goodgrocer.app.BuildConfig
+import com.goodgrocer.app.data.Address
 import com.goodgrocer.app.data.cartSubtotal
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -55,10 +64,17 @@ fun ShopApp(vm: ShopViewModel) {
         .collectAsStateWithLifecycle(null)
     val cart by vm.cart.collectAsStateWithLifecycle()
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
+    val customerEntryChecked by vm.customerEntryChecked.collectAsStateWithLifecycle()
+    val activity = LocalActivity.current
+    LifecycleStartEffect(vm, activity) {
+        onStopOrDispose {
+            if (activity?.isChangingConfigurations != true) vm.resetCustomerEntryCheck()
+        }
+    }
     val nav = rememberNavController()
     val uriHandler = LocalUriHandler.current
     val entry by nav.currentBackStackEntryAsState()
-    val startDestination = remember { if (signedIn) "home" else "entry" }
+    val startDestination = remember { if (signedIn) "starting" else "entry" }
     val route = entry?.destination?.route ?: startDestination
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
@@ -75,6 +91,32 @@ fun ShopApp(vm: ShopViewModel) {
             }
         }
     }
+    LaunchedEffect(signedIn, customerEntryChecked) {
+        if (!signedIn) {
+            vm.resetCustomerEntryCheck()
+        } else if (!customerEntryChecked) {
+            // This belongs to the app session, not an individual screen visit.
+            // Keeping the check in the ViewModel avoids repeating it on rotation.
+            val entering = nav.currentDestination?.route in
+                listOf("entry", "starting", "address-onboarding")
+            if (entering) {
+                nav.navigate("starting") {
+                    popUpTo(nav.graph.id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            val offer = vm.prepareCustomerEntry()
+            if (offer != null && vm.signedIn.value) {
+                if (entering || offer) {
+                    nav.navigate("home") {
+                        popUpTo(nav.graph.id) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                if (offer) nav.navigate("address-onboarding")
+            }
+        }
+    }
     val navigate: (String) -> Unit = { destination ->
         nav.navigate(destination) {
             launchSingleTop =
@@ -86,8 +128,14 @@ fun ShopApp(vm: ShopViewModel) {
     ) -> Unit = { destination ->
         navigate(if (signedIn) destination else "entry")
     }
+    val finishOnboarding: () -> Unit = {
+        nav.navigate("home") {
+            popUpTo("home")
+            launchSingleTop = true
+        }
+    }
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
-        if (route != "home" && route != "entry") {
+        if (route !in listOf("home", "entry", "starting")) {
             TopAppBar(title = {
                 Text(
                     when {
@@ -95,14 +143,18 @@ fun ShopApp(vm: ShopViewModel) {
                         route.startsWith("category") -> "Shop by aisle"
                         route.startsWith("order/") -> "Your order"
                         route == "delete-account" -> "Delete account"
+                        route == "address-onboarding" -> "Where should we deliver?"
                         else -> route.replaceFirstChar { it.uppercase() }
                     }
                 )
             }, navigationIcon = {
                 IconButton(onClick = {
-                    nav.popBackStack()
+                    if (route == "address-onboarding") finishOnboarding() else nav.popBackStack()
                 }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
             }, actions = {
+                if (route == "address-onboarding") {
+                    TextButton(onClick = finishOnboarding) { Text("Skip for now") }
+                }
                 if (route ==
                     "orders"
                 ) {
@@ -176,11 +228,25 @@ fun ShopApp(vm: ShopViewModel) {
             modifier = Modifier.padding(padding)
         ) {
             composable("entry") {
-                EntryScreen(vm) {
-                    nav.navigate("home") {
-                        popUpTo("entry") { inclusive = true }
-                        launchSingleTop = true
-                    }
+                EntryScreen(vm) { }
+            }
+            composable("starting") {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            composable("address-onboarding") {
+                val state = collectShopState(vm)
+                BackHandler(onBack = finishOnboarding)
+                if (customerEntryChecked && signedIn) {
+                    AddressEditor(
+                        initial = Address(),
+                        busy = state.actionLoading,
+                        lookup = vm::reverseGeocode,
+                        save = { address -> vm.saveAddress(address, finishOnboarding) },
+                        cancel = finishOnboarding,
+                        cancelLabel = "Skip for now"
+                    )
                 }
             }
             composable("home") {

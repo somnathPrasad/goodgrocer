@@ -72,3 +72,25 @@ A live Google deletion was not performed because production OAuth clients and
 origins are not configured in this environment. Production still requires the
 public website deployment, Android public-site URL, Play Store URL and a daily
 schedule for `erase-expired-customer-data`.
+
+## One-time customer address onboarding — 2026-10-13
+
+- Backend suite: 127 tests passed with operator `.env` settings excluded and
+  local image storage selected. New coverage checks read-only eligibility,
+  account/session ownership, once-only claims across sessions and concurrent
+  devices, address deletion and transaction rollback.
+- The migration test additionally upgrades an existing Google Customer, checks
+  its new false onboarding flag, rolls back the new revision without losing the
+  Customer, and completes the historical upgrade/check/downgrade cycle.
+- Python Ruff lint and formatting checks: passed.
+- Android: 11 unit tests, `ktlintCheck`, `lintDebug` and `assembleDebug` passed.
+  New unit tests cover eligibility failure without consumption, ineligible
+  customers, another device winning the claim, claim failure and cancellation.
+- OpenAPI and admin TypeScript contracts regenerated; admin type checking passed.
+- `git diff --check`: passed.
+
+Live Google sign-in, physical-device onboarding, rotation and background/resume
+interaction were not manually exercised. Release still requires the new backend
+migration before deploying the Android update. The atomic display claim favors
+at-most-once prompting: a lost claim response can consume the offer without
+displaying it, as recorded in ADR-013.

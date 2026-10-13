@@ -22,6 +22,18 @@ client ID. Test on an Android device with Google Play services and the release
 signing certificate before opening login. Contact phones are collected for
 fulfilment and are not treated as verified identity.
 
+### One-time address onboarding
+
+Run `uv run --directory services/api alembic upgrade head` and deploy the API
+before releasing the Android onboarding update. Revision `e1b42c6d8a90` adds
+`customers.address_onboarding_seen`, initialized to false for existing Customers.
+Existing saved addresses suppress the offer. Addressless Customers receive one
+optional offer across devices; skip/save return to Home. The flag is consumed by
+an authenticated atomic claim immediately before display. A failed eligibility
+read leaves history unchanged and proceeds to Home. A lost claim response can
+consume the offer without displaying it; see ADR-013. Older Android versions
+continue using Google sign-in without requesting onboarding.
+
 ### WhatsApp webhook
 
 The callback path is `/api/v1/webhooks/whatsapp` (no trailing slash). It captures

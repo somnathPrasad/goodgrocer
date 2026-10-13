@@ -18,6 +18,23 @@ def list_addresses(db, customer_id):
     ).all()
 
 
+def address_onboarding(db, customer_id, *, claim=False):
+    query = select(Customer).where(Customer.id == customer_id)
+    if claim:
+        # Refresh even if authentication already loaded this Customer: another
+        # device may have consumed the offer while this request waited for its lock.
+        query = query.with_for_update().execution_options(populate_existing=True)
+    current = db.scalar(query)
+    if current is None:
+        raise DomainError("NOT_FOUND", "Resource not found", 404)
+    has_address = db.scalar(select(Address.id).where(Address.customer_id == customer_id).limit(1))
+    eligible = not current.address_onboarding_seen and has_address is None
+    if claim and eligible:
+        current.address_onboarding_seen = True
+        db.flush()
+    return {"eligible": eligible}
+
+
 def create_address(db, customer_id, data):
     address = Address(customer_id=customer_id, **data.model_dump())
     db.add(address)

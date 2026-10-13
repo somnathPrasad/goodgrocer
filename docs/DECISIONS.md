@@ -323,3 +323,24 @@ Capture is preparation for WhatsApp OTP login; the existing Google login remains
 active until that separate implementation is complete. Retain raw deliveries for
 30 days for integration diagnosis, with daily operator-scheduled cleanup and
 restricted database access because they can contain phone numbers and message text.
+
+## ADR-013: Offer optional address onboarding once per Customer
+
+- Date: 2026-10-13
+- Status: Accepted
+
+Keep Google authentication and offer address creation to customers without saved
+addresses after sign-in or authenticated app reopening. Allow skipping to Home;
+successful save also goes to Home. Delivery checkout still needs a saved address.
+Repeated prompts would interrupt browsing, so consume the offer on its first
+display attempt rather than waiting for a saved address or an explicit dismissal.
+Persist this history on the backend Customer instead of on the installation so
+sign-out, reinstalling, another device or deleting the last address does not
+repeat a consumed offer.
+
+Use a read-only eligibility check followed by a locked, atomic claim immediately
+before rendering. Failed reads proceed to Home without changing history and retry
+on the next opening. Only one concurrent device wins a claim. If a claim commits
+but its response is lost, or the process exits before rendering, the offer can be
+consumed without appearing; avoiding duplicates is the preferred tradeoff. No new
+service or login provider is needed. Customer deletion removes the history.

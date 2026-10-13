@@ -294,6 +294,46 @@
         }
       }
     },
+    "/api/v1/account/address-onboarding": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Address Onboarding",
+        "operationId": "address_onboarding_api_v1_account_address_onboarding_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressOnboardingOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Claim Address Onboarding",
+        "operationId": "claim_address_onboarding_api_v1_account_address_onboarding_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressOnboardingOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/account/deletion": {
       "post": {
         "tags": [
@@ -2123,6 +2163,20 @@
           "state"
         ],
         "title": "AddressInput"
+      },
+      "AddressOnboardingOut": {
+        "properties": {
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "eligible"
+        ],
+        "title": "AddressOnboardingOut"
       },
       "AddressOut": {
         "properties": {

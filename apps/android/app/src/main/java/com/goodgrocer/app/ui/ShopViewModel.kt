@@ -20,6 +20,7 @@ import com.goodgrocer.app.data.Quote
 import com.goodgrocer.app.data.Repository
 import com.goodgrocer.app.data.StoreConfig
 import com.goodgrocer.app.data.Variant
+import com.goodgrocer.app.data.offerAddressOnboarding
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -88,6 +89,8 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     private var favouritesLoaded = false
     private var addressesLoaded = false
     private var ordersLoaded = false
+    private val _customerEntryChecked = MutableStateFlow(false)
+    val customerEntryChecked = _customerEntryChecked.asStateFlow()
     private val refreshWindowMs = 60_000L
 
     private fun begin(setLoading: (ShopState) -> ShopState) {
@@ -258,6 +261,15 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         repository.signIn(repository.api.googleLogin(GoogleLoginRequest(idToken)).token)
         done()
     }
+    fun resetCustomerEntryCheck() {
+        _customerEntryChecked.value = false
+    }
+    suspend fun prepareCustomerEntry(): Boolean? {
+        if (customerEntryChecked.value) return null
+        val offer = repository.api.offerAddressOnboarding()
+        _customerEntryChecked.value = true
+        return offer
+    }
     fun deleteAccount(idToken: String) = task {
         repository.api.deleteAccount(GoogleLoginRequest(idToken))
         repository.clearCustomerData()
@@ -340,19 +352,26 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun saveAddress(address: Address, done: () -> Unit) = task {
-        if (address.id ==
+        val saved = if (address.id ==
             null
         ) {
             repository.api.createAddress(address)
         } else {
             repository.api.editAddress(address.id, address.copy(id = null))
         }
-        val list = repository.api.addresses()
+        // The write response establishes success. A second network request must
+        // not turn a saved address into an apparent failure and a duplicate retry.
+        addressesCache.removeAll { it.id == saved.id }
+        addressesCache.add(saved)
+        addressesCache.sortBy { it.id }
+        val list = state.value.addresses.filterNot {
+            it.id == saved.id
+        }.plus(saved).sortedBy { it.id }
         change {
             it.copy(
                 addresses = list,
                 addressId =
-                it.addressId ?: list.lastOrNull()?.id
+                it.addressId ?: saved.id
             )
         }
         invalidateQuote()
@@ -360,7 +379,8 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun deleteAddress(id: Int) = task {
         repository.api.deleteAddress(id)
-        val list = repository.api.addresses()
+        addressesCache.removeAll { it.id == id }
+        val list = state.value.addresses.filterNot { it.id == id }
         change {
             it.copy(
                 addresses = list,
